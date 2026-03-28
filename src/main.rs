@@ -5,7 +5,7 @@ use std::time::Duration;
 use subxt::{OnlineClient, PolkadotConfig};
 
 use accounts::load_account_store;
-use views::{Home, IpfsStatus, Navbar};
+use views::{ChainStatus, Home, IpfsStatus, Navbar};
 
 const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
 const IPFS_DAEMON_ADDR: &str = "/ip4/127.0.0.1/tcp/5001";
@@ -15,9 +15,20 @@ const IPFS_HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone, PartialEq)]
 struct ChainConnection {
-    block_number: Option<String>,
+    details: ChainDetails,
     status: ConnectionStatus,
     last_error: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Default)]
+struct ChainDetails {
+    best_block_number: Option<String>,
+    best_block_hash: Option<String>,
+    finalized_block_number: Option<String>,
+    finalized_block_hash: Option<String>,
+    genesis_hash: Option<String>,
+    spec_version: Option<u32>,
+    transaction_version: Option<u32>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -70,25 +81,25 @@ impl Default for IpfsConnection {
 }
 
 impl ChainConnection {
-    fn connecting() -> Self {
+    fn connecting(details: ChainDetails) -> Self {
         Self {
-            block_number: None,
+            details,
             status: ConnectionStatus::Connecting,
             last_error: None,
         }
     }
 
-    fn connected(block_number: Option<String>) -> Self {
+    fn connected(details: ChainDetails) -> Self {
         Self {
-            block_number,
+            details,
             status: ConnectionStatus::Connected,
             last_error: None,
         }
     }
 
-    fn reconnecting(block_number: Option<String>, error: String) -> Self {
+    fn reconnecting(details: ChainDetails, error: String) -> Self {
         Self {
-            block_number,
+            details,
             status: ConnectionStatus::Reconnecting,
             last_error: Some(error),
         }
@@ -97,7 +108,7 @@ impl ChainConnection {
 
 impl Default for ChainConnection {
     fn default() -> Self {
-        Self::connecting()
+        Self::connecting(ChainDetails::default())
     }
 }
 
@@ -135,6 +146,8 @@ enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        #[route("/chain")]
+        ChainStatus {},
         #[route("/ipfs")]
         IpfsStatus {},
 }
@@ -183,12 +196,8 @@ fn App() -> Element {
 
 async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
     loop {
-        let last_block = chain_connection().block_number;
-        chain_connection.set(ChainConnection {
-            block_number: last_block,
-            status: ConnectionStatus::Connecting,
-            last_error: None,
-        });
+        let details = chain_connection().details.clone();
+        chain_connection.set(ChainConnection::connecting(details));
 
         let result = stream_best_blocks(chain_connection).await;
 
@@ -197,8 +206,8 @@ async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
             Err(error) => error,
         };
 
-        let last_block = chain_connection().block_number;
-        chain_connection.set(ChainConnection::reconnecting(last_block, error));
+        let details = chain_connection().details.clone();
+        chain_connection.set(ChainConnection::reconnecting(details, error));
         tokio::time::sleep(RECONNECT_DELAY).await;
     }
 }
@@ -208,21 +217,67 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
         .await
         .map_err(|error| format!("Failed to connect to {ACUITY_NODE_URL}: {error}"))?;
 
-    let existing_block = chain_connection().block_number;
-    chain_connection.set(ChainConnection::connected(existing_block));
+    let finalized_block = client
+        .at_current_block()
+        .await
+        .map_err(|error| format!("Failed to inspect the latest finalized block: {error}"))?;
 
-    let mut blocks = client
+    let mut details = chain_connection().details.clone();
+    let finalized_block_number = finalized_block.block_number().to_string();
+    let finalized_block_hash = finalized_block.block_hash().to_string();
+
+    details.finalized_block_number = Some(finalized_block_number.clone());
+    details.finalized_block_hash = Some(finalized_block_hash.clone());
+    details.best_block_number = Some(finalized_block_number);
+    details.best_block_hash = Some(finalized_block_hash);
+    details.genesis_hash = Some(client.genesis_hash().to_string());
+    details.spec_version = Some(finalized_block.spec_version());
+    details.transaction_version = Some(finalized_block.transaction_version());
+    chain_connection.set(ChainConnection::connected(details));
+
+    let mut best_blocks = client
         .stream_best_blocks()
         .await
         .map_err(|error| format!("Failed to subscribe to best blocks: {error}"))?;
 
-    while let Some(block) = blocks.next().await {
-        let block = block.map_err(|error| format!("Failed to read best block: {error}"))?;
-        let block_number = block.header().number.to_string();
-        chain_connection.set(ChainConnection::connected(Some(block_number)));
-    }
+    let mut finalized_blocks = client
+        .stream_blocks()
+        .await
+        .map_err(|error| format!("Failed to subscribe to finalized blocks: {error}"))?;
 
-    Ok(())
+    loop {
+        tokio::select! {
+            next_best = best_blocks.next() => {
+                let block = match next_best {
+                    Some(block) => block.map_err(|error| format!("Failed to read best block: {error}"))?,
+                    None => return Ok(()),
+                };
+
+                let mut details = chain_connection().details.clone();
+                details.best_block_number = Some(block.number().to_string());
+                details.best_block_hash = Some(block.hash().to_string());
+                chain_connection.set(ChainConnection::connected(details));
+            }
+            next_finalized = finalized_blocks.next() => {
+                let block = match next_finalized {
+                    Some(block) => block.map_err(|error| format!("Failed to read finalized block: {error}"))?,
+                    None => return Ok(()),
+                };
+
+                let finalized_at = block
+                    .at()
+                    .await
+                    .map_err(|error| format!("Failed to inspect finalized runtime metadata: {error}"))?;
+
+                let mut details = chain_connection().details.clone();
+                details.finalized_block_number = Some(block.number().to_string());
+                details.finalized_block_hash = Some(block.hash().to_string());
+                details.spec_version = Some(finalized_at.spec_version());
+                details.transaction_version = Some(finalized_at.transaction_version());
+                chain_connection.set(ChainConnection::connected(details));
+            }
+        }
+    }
 }
 
 async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {

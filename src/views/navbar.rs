@@ -19,10 +19,12 @@ pub fn Navbar() -> Element {
     };
 
     let status_label = match chain_connection.status {
-        ConnectionStatus::Connected => match chain_connection.block_number.as_deref() {
-            Some(block_number) => format!("Block {block_number}"),
-            None => "Connected".to_string(),
-        },
+        ConnectionStatus::Connected => {
+            match chain_connection.details.best_block_number.as_deref() {
+                Some(block_number) => format!("Block {block_number}"),
+                None => "Connected".to_string(),
+            }
+        }
         ConnectionStatus::Connecting => "Connecting to Acuity".to_string(),
         ConnectionStatus::Reconnecting => match chain_connection.last_error.as_deref() {
             Some(error) => format!("Reconnecting: {error}"),
@@ -80,8 +82,9 @@ pub fn Navbar() -> Element {
                     class: "account-status {account_status_class}",
                     "{account_label}"
                 }
-                div {
-                    class: "chain-status {status_class}",
+                Link {
+                    class: "status-link chain-status {status_class}",
+                    to: Route::ChainStatus {},
                     "{status_label}"
                 }
                 Link {
