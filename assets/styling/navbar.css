@@ -57,6 +57,7 @@
 }
 
 .chain-status,
+.indexer-status,
 .ipfs-status {
   padding: 8px 12px;
   border-radius: 999px;
@@ -98,6 +99,7 @@
 }
 
 .chain-status.connected,
+.indexer-status.connected,
 .ipfs-status.connected {
   color: #dbffe4;
   background: rgba(78, 183, 104, 0.12);
@@ -106,6 +108,8 @@
 
 .chain-status.connecting,
 .chain-status.reconnecting,
+.indexer-status.connecting,
+.indexer-status.reconnecting,
 .ipfs-status.connecting,
 .ipfs-status.reconnecting {
   color: #fff3d4;
@@ -129,6 +133,7 @@
   }
 
   .chain-status,
+  .indexer-status,
   .ipfs-status,
   .account-status {
     white-space: normal;

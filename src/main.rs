@@ -1,13 +1,16 @@
 use dioxus::prelude::*;
+use futures::{SinkExt, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
 use subxt::{OnlineClient, PolkadotConfig};
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use accounts::load_account_store;
-use views::{ChainStatus, Home, IpfsStatus, Navbar};
+use views::{ChainStatus, Home, IndexerStatus, IpfsStatus, Navbar};
 
 const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
+const INDEXER_URL: &str = "ws://127.0.0.1:8172";
 const IPFS_DAEMON_ADDR: &str = "/ip4/127.0.0.1/tcp/5001";
 const IPFS_API_URL: &str = "http://127.0.0.1:5001";
 const RECONNECT_DELAY: Duration = Duration::from_secs(2);
@@ -36,6 +39,24 @@ struct IpfsConnection {
     status: ConnectionStatus,
     last_error: Option<String>,
     details: Option<IpfsDaemonDetails>,
+}
+
+#[derive(Clone, PartialEq)]
+struct IndexerConnection {
+    status: ConnectionStatus,
+    last_error: Option<String>,
+    details: IndexerDetails,
+}
+
+#[derive(Clone, PartialEq, Default)]
+struct IndexerDetails {
+    spans: Vec<IndexerSpan>,
+}
+
+#[derive(Clone, Deserialize, PartialEq)]
+struct IndexerSpan {
+    start: u32,
+    end: u32,
 }
 
 #[derive(Clone, PartialEq)]
@@ -77,6 +98,44 @@ impl IpfsConnection {
 impl Default for IpfsConnection {
     fn default() -> Self {
         Self::connecting(None)
+    }
+}
+
+impl IndexerConnection {
+    fn connecting(details: IndexerDetails) -> Self {
+        Self {
+            status: ConnectionStatus::Connecting,
+            last_error: None,
+            details,
+        }
+    }
+
+    fn connected(details: IndexerDetails) -> Self {
+        Self {
+            status: ConnectionStatus::Connected,
+            last_error: None,
+            details,
+        }
+    }
+
+    fn reconnecting(details: IndexerDetails, error: String) -> Self {
+        Self {
+            status: ConnectionStatus::Reconnecting,
+            last_error: Some(error),
+            details,
+        }
+    }
+}
+
+impl Default for IndexerConnection {
+    fn default() -> Self {
+        Self::connecting(IndexerDetails::default())
+    }
+}
+
+impl IndexerDetails {
+    fn latest_indexed_block(&self) -> Option<u32> {
+        self.spans.iter().map(|span| span.end).max()
     }
 }
 
@@ -137,6 +196,14 @@ struct IpfsIdResponse {
     protocols: Vec<String>,
 }
 
+#[derive(Deserialize)]
+struct IndexerResponse {
+    #[serde(rename = "type")]
+    message_type: String,
+    #[serde(default)]
+    data: Option<Vec<IndexerSpan>>,
+}
+
 mod accounts;
 mod views;
 
@@ -148,6 +215,8 @@ enum Route {
         Home {},
         #[route("/chain")]
         ChainStatus {},
+        #[route("/indexer")]
+        IndexerStatus {},
         #[route("/ipfs")]
         IpfsStatus {},
 }
@@ -163,9 +232,11 @@ fn main() {
 #[component]
 fn App() -> Element {
     let chain_connection = use_signal(ChainConnection::default);
+    let indexer_connection = use_signal(IndexerConnection::default);
     let ipfs_connection = use_signal(IpfsConnection::default);
     let account_store = use_signal(load_account_store);
     use_context_provider(|| chain_connection);
+    use_context_provider(|| indexer_connection);
     use_context_provider(|| ipfs_connection);
     use_context_provider(|| account_store);
 
@@ -182,6 +253,14 @@ fn App() -> Element {
 
         spawn(async move {
             watch_ipfs_daemon(ipfs_connection).await;
+        })
+    });
+
+    let _indexer_connection_task = use_hook(move || {
+        let indexer_connection = indexer_connection;
+
+        spawn(async move {
+            watch_indexer(indexer_connection).await;
         })
     });
 
@@ -298,6 +377,79 @@ async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {
         ipfs_connection.set(IpfsConnection::reconnecting(details, error));
         tokio::time::sleep(RECONNECT_DELAY).await;
     }
+}
+
+async fn watch_indexer(mut indexer_connection: Signal<IndexerConnection>) {
+    loop {
+        let details = indexer_connection().details.clone();
+        indexer_connection.set(IndexerConnection::connecting(details));
+
+        let result = maintain_indexer_connection(indexer_connection).await;
+
+        let error = match result {
+            Ok(()) => format!("Lost connection to {INDEXER_URL}"),
+            Err(error) => error,
+        };
+
+        let details = indexer_connection().details.clone();
+        indexer_connection.set(IndexerConnection::reconnecting(details, error));
+        tokio::time::sleep(RECONNECT_DELAY).await;
+    }
+}
+
+async fn maintain_indexer_connection(
+    indexer_connection: Signal<IndexerConnection>,
+) -> Result<(), String> {
+    let (stream, _) = connect_async(INDEXER_URL)
+        .await
+        .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
+
+    let (mut sender, mut receiver) = stream.split();
+
+    sender
+        .send(Message::Text(r#"{"type":"SubscribeStatus"}"#.into()))
+        .await
+        .map_err(|error| format!("Failed to subscribe to indexer status: {error}"))?;
+
+    sender
+        .send(Message::Text(r#"{"type":"Status"}"#.into()))
+        .await
+        .map_err(|error| format!("Failed to request indexer status snapshot: {error}"))?;
+
+    while let Some(message) = receiver.next().await {
+        let message =
+            message.map_err(|error| format!("Failed to read indexer message: {error}"))?;
+
+        match message {
+            Message::Text(payload) => apply_indexer_message(indexer_connection, payload.as_ref())?,
+            Message::Binary(payload) => {
+                let payload = std::str::from_utf8(&payload)
+                    .map_err(|error| format!("Indexer sent invalid UTF-8 payload: {error}"))?;
+                apply_indexer_message(indexer_connection, payload)?;
+            }
+            Message::Close(_) => return Ok(()),
+            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn apply_indexer_message(
+    mut indexer_connection: Signal<IndexerConnection>,
+    payload: &str,
+) -> Result<(), String> {
+    let response = serde_json::from_str::<IndexerResponse>(payload)
+        .map_err(|error| format!("Failed to decode indexer response: {error}"))?;
+
+    if response.message_type == "status" {
+        let spans = response
+            .data
+            .ok_or_else(|| "Indexer status response was missing span data".to_string())?;
+        indexer_connection.set(IndexerConnection::connected(IndexerDetails { spans }));
+    }
+
+    Ok(())
 }
 
 async fn maintain_ipfs_connection(

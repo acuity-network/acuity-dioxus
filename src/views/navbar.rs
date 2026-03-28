@@ -1,4 +1,7 @@
-use crate::{accounts::AccountStore, ChainConnection, ConnectionStatus, IpfsConnection, Route};
+use crate::{
+    accounts::AccountStore, ChainConnection, ConnectionStatus, IndexerConnection, IpfsConnection,
+    Route,
+};
 use dioxus::prelude::*;
 
 const NAVBAR_CSS: Asset = asset!("/assets/styling/navbar.css");
@@ -7,6 +10,8 @@ const NAVBAR_CSS: Asset = asset!("/assets/styling/navbar.css");
 pub fn Navbar() -> Element {
     let chain_connection = use_context::<Signal<ChainConnection>>();
     let chain_connection = chain_connection();
+    let indexer_connection = use_context::<Signal<IndexerConnection>>();
+    let indexer_connection = indexer_connection();
     let ipfs_connection = use_context::<Signal<IpfsConnection>>();
     let ipfs_connection = ipfs_connection();
     let account_store = use_context::<Signal<AccountStore>>();
@@ -42,6 +47,21 @@ pub fn Navbar() -> Element {
         ConnectionStatus::Connected => "IPFS connected".to_string(),
         ConnectionStatus::Connecting => "Connecting to IPFS".to_string(),
         ConnectionStatus::Reconnecting => "Reconnecting to IPFS".to_string(),
+    };
+
+    let indexer_status_class = match indexer_connection.status {
+        ConnectionStatus::Connected => "connected",
+        ConnectionStatus::Connecting => "connecting",
+        ConnectionStatus::Reconnecting => "reconnecting",
+    };
+
+    let indexer_status_label = match indexer_connection.status {
+        ConnectionStatus::Connected => match indexer_connection.details.latest_indexed_block() {
+            Some(block_number) => format!("Indexed to {block_number}"),
+            None => "Indexer connected".to_string(),
+        },
+        ConnectionStatus::Connecting => "Connecting to indexer".to_string(),
+        ConnectionStatus::Reconnecting => "Reconnecting to indexer".to_string(),
     };
 
     let active_account = account_store.active_account().cloned();
@@ -86,6 +106,11 @@ pub fn Navbar() -> Element {
                     class: "status-link chain-status {status_class}",
                     to: Route::ChainStatus {},
                     "{status_label}"
+                }
+                Link {
+                    class: "status-link indexer-status {indexer_status_class}",
+                    to: Route::IndexerStatus {},
+                    "{indexer_status_label}"
                 }
                 Link {
                     class: "status-link ipfs-status {ipfs_status_class}",

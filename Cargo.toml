@@ -22,6 +22,7 @@ sp-core = { version = "39.0.0", features = ["std"] }
 subxt = { version = "0.50.0", features = ["native"] }
 subxt-signer = { version = "0.50.0", default-features = false, features = ["polkadot-js-compat"] }
 tokio = { version = "1", features = ["time"] }
+tokio-tungstenite = "0.28"
 
 [features]
 default = ["desktop"]
