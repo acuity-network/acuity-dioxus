@@ -1,16 +1,76 @@
 #navbar {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  max-width: 1080px;
+  margin: 0 auto 20px;
+  padding: 14px 18px;
+  border: 1px solid rgba(145, 164, 210, 0.16);
+  border-radius: 14px;
+  background: rgba(20, 25, 34, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #dfe7fb;
 }
 
 #navbar a {
-  color: #ffffff;
-  margin-right: 20px;
+  color: rgba(255, 255, 255, 0.8);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 #navbar a:hover {
   cursor: pointer;
-  color: #91a4d2;
+  color: #dfe7fb;
+}
+
+.chain-status {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.chain-status.connected {
+  color: #dbffe4;
+  background: rgba(78, 183, 104, 0.12);
+  border-color: rgba(78, 183, 104, 0.22);
+}
+
+.chain-status.connecting,
+.chain-status.reconnecting {
+  color: #fff3d4;
+  background: rgba(212, 154, 42, 0.12);
+  border-color: rgba(212, 154, 42, 0.22);
+}
+
+@media (max-width: 720px) {
+  #navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-links {
+    gap: 14px;
+  }
+
+  .chain-status {
+    white-space: normal;
+  }
 }

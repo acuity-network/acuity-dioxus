@@ -8,6 +8,9 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.7.1", features = ["router"] }
+futures = "0.3"
+subxt = { version = "0.50.0", features = ["native"] }
+tokio = { version = "1", features = ["time"] }
 
 [features]
 default = ["desktop"]

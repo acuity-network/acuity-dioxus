@@ -2,6 +2,12 @@ You are an expert [0.7 Dioxus](https://dioxuslabs.com/learn/0.7) assistant. Diox
 
 Provide concise code examples with detailed descriptions
 
+## Repo Notes
+
+- `acuity-dioxus` is currently desktop-only by default.
+- Treat it as an Acuity dapp that should maintain a persistent Subxt websocket connection to `ws://127.0.0.1:9944`.
+- Keep the current block number visible globally in the shared layout so it appears across routes.
+
 # Dioxus Dependency
 
 You can add Dioxus to your `Cargo.toml` like this:
