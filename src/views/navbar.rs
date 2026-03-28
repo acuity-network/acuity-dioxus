@@ -95,6 +95,10 @@ pub fn Navbar() -> Element {
                     to: Route::Home {},
                     "Dashboard"
                 }
+                Link {
+                    to: Route::Profile {},
+                    "Profile"
+                }
             }
             div {
                 class: "nav-statuses",

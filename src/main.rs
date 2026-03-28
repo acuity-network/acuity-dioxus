@@ -7,12 +7,12 @@ use subxt::{OnlineClient, PolkadotConfig};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use accounts::load_account_store;
-use views::{ChainStatus, Home, IndexerStatus, IpfsStatus, Navbar};
+use views::{ChainStatus, Home, IndexerStatus, IpfsStatus, Navbar, Profile};
 
-const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
-const INDEXER_URL: &str = "ws://127.0.0.1:8172";
+pub(crate) const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
+pub(crate) const INDEXER_URL: &str = "ws://127.0.0.1:8172";
 const IPFS_DAEMON_ADDR: &str = "/ip4/127.0.0.1/tcp/5001";
-const IPFS_API_URL: &str = "http://127.0.0.1:5001";
+pub(crate) const IPFS_API_URL: &str = "http://127.0.0.1:5001";
 const RECONNECT_DELAY: Duration = Duration::from_secs(2);
 const IPFS_HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -205,6 +205,7 @@ struct IndexerResponse {
 }
 
 mod accounts;
+mod profile;
 mod views;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -213,6 +214,8 @@ enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        #[route("/profile")]
+        Profile {},
         #[route("/chain")]
         ChainStatus {},
         #[route("/indexer")]
