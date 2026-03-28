@@ -5,7 +5,7 @@ use std::time::Duration;
 use subxt::{OnlineClient, PolkadotConfig};
 
 use accounts::load_account_store;
-use views::{Home, Navbar};
+use views::{Home, IpfsStatus, Navbar};
 
 const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
 const IPFS_DAEMON_ADDR: &str = "/ip4/127.0.0.1/tcp/5001";
@@ -24,34 +24,48 @@ struct ChainConnection {
 struct IpfsConnection {
     status: ConnectionStatus,
     last_error: Option<String>,
+    details: Option<IpfsDaemonDetails>,
+}
+
+#[derive(Clone, PartialEq)]
+struct IpfsDaemonDetails {
+    peer_id: String,
+    public_key: Option<String>,
+    addresses: Vec<String>,
+    agent_version: Option<String>,
+    protocol_version: Option<String>,
+    protocols: Vec<String>,
 }
 
 impl IpfsConnection {
-    fn connecting() -> Self {
+    fn connecting(details: Option<IpfsDaemonDetails>) -> Self {
         Self {
             status: ConnectionStatus::Connecting,
             last_error: None,
+            details,
         }
     }
 
-    fn connected() -> Self {
+    fn connected(details: IpfsDaemonDetails) -> Self {
         Self {
             status: ConnectionStatus::Connected,
             last_error: None,
+            details: Some(details),
         }
     }
 
-    fn reconnecting(error: String) -> Self {
+    fn reconnecting(details: Option<IpfsDaemonDetails>, error: String) -> Self {
         Self {
             status: ConnectionStatus::Reconnecting,
             last_error: Some(error),
+            details,
         }
     }
 }
 
 impl Default for IpfsConnection {
     fn default() -> Self {
-        Self::connecting()
+        Self::connecting(None)
     }
 }
 
@@ -98,6 +112,18 @@ enum ConnectionStatus {
 struct IpfsIdResponse {
     #[serde(rename = "ID")]
     id: String,
+    #[serde(rename = "PublicKey")]
+    public_key: Option<String>,
+    #[serde(rename = "Addresses")]
+    #[serde(default)]
+    addresses: Vec<String>,
+    #[serde(rename = "AgentVersion")]
+    agent_version: Option<String>,
+    #[serde(rename = "ProtocolVersion")]
+    protocol_version: Option<String>,
+    #[serde(rename = "Protocols")]
+    #[serde(default)]
+    protocols: Vec<String>,
 }
 
 mod accounts;
@@ -109,6 +135,8 @@ enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        #[route("/ipfs")]
+        IpfsStatus {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -201,7 +229,8 @@ async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {
     let client = Client::new();
 
     loop {
-        ipfs_connection.set(IpfsConnection::connecting());
+        let details = ipfs_connection().details.clone();
+        ipfs_connection.set(IpfsConnection::connecting(details));
 
         let result = maintain_ipfs_connection(&client, ipfs_connection).await;
 
@@ -210,7 +239,8 @@ async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {
             Err(error) => error,
         };
 
-        ipfs_connection.set(IpfsConnection::reconnecting(error));
+        let details = ipfs_connection().details.clone();
+        ipfs_connection.set(IpfsConnection::reconnecting(details, error));
         tokio::time::sleep(RECONNECT_DELAY).await;
     }
 }
@@ -241,7 +271,14 @@ async fn maintain_ipfs_connection(
             ));
         }
 
-        ipfs_connection.set(IpfsConnection::connected());
+        ipfs_connection.set(IpfsConnection::connected(IpfsDaemonDetails {
+            peer_id: payload.id,
+            public_key: payload.public_key,
+            addresses: payload.addresses,
+            agent_version: payload.agent_version,
+            protocol_version: payload.protocol_version,
+            protocols: payload.protocols,
+        }));
         tokio::time::sleep(IPFS_HEALTHCHECK_INTERVAL).await;
     }
 }

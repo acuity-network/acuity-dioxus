@@ -84,8 +84,9 @@ pub fn Navbar() -> Element {
                     class: "chain-status {status_class}",
                     "{status_label}"
                 }
-                div {
-                    class: "ipfs-status {ipfs_status_class}",
+                Link {
+                    class: "status-link ipfs-status {ipfs_status_class}",
+                    to: Route::IpfsStatus {},
                     "{ipfs_status_label}"
                 }
             }

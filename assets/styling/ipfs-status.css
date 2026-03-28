@@ -1,0 +1,227 @@
+.ipfs-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel-surface {
+  border: 1px solid rgba(145, 164, 210, 0.16);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(20, 25, 34, 0.9) 0%, rgba(14, 18, 25, 0.96) 100%);
+  box-shadow: 0 20px 50px rgba(4, 10, 22, 0.34);
+}
+
+.ipfs-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  gap: 18px;
+  padding: 28px;
+}
+
+.hero-copy h1,
+.panel-heading h2 {
+  margin: 0;
+  color: #f7fbff;
+}
+
+.eyebrow,
+.label {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #8fb7ff;
+}
+
+.hero-text,
+.status-copy,
+.banner-copy,
+.empty-state,
+.info-value,
+.field-value {
+  margin: 0;
+  color: rgba(235, 242, 255, 0.82);
+  line-height: 1.6;
+}
+
+.hero-copy,
+.hero-status-card,
+.overview-panel,
+.identity-panel,
+.addresses-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hero-status-card {
+  padding: 20px;
+  border-radius: 20px;
+  background: radial-gradient(circle at top right, rgba(91, 132, 226, 0.18), transparent 45%), rgba(9, 14, 23, 0.88);
+  border: 1px solid rgba(144, 166, 215, 0.18);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+
+.status-badge.connected,
+.info-card.connected {
+  color: #dbffe4;
+  background: rgba(78, 183, 104, 0.12);
+  border-color: rgba(78, 183, 104, 0.22);
+}
+
+.status-badge.connecting,
+.status-badge.reconnecting,
+.info-card.connecting,
+.info-card.reconnecting {
+  color: #fff3d4;
+  background: rgba(212, 154, 42, 0.12);
+  border-color: rgba(212, 154, 42, 0.22);
+}
+
+.ipfs-banner {
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 154, 42, 0.24);
+  background: rgba(212, 154, 42, 0.1);
+}
+
+.banner-title-row,
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.banner-title {
+  color: #fff7e4;
+  font-weight: 600;
+}
+
+.banner-pill,
+.address-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.banner-pill {
+  color: #fff3d4;
+  background: rgba(120, 76, 15, 0.44);
+}
+
+.ipfs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.overview-panel,
+.identity-panel,
+.addresses-panel {
+  padding: 24px;
+}
+
+.facts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.info-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(145, 164, 210, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.info-card.neutral {
+  color: #e8f1ff;
+}
+
+.field-stack,
+.address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.metadata-field,
+.address-row,
+.empty-state {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(145, 164, 210, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mono,
+.address-row code {
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+  word-break: break-word;
+}
+
+.address-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.address-row code {
+  color: #f4f7ff;
+  font-size: 0.94rem;
+}
+
+.address-badge {
+  color: #dce9ff;
+  background: rgba(91, 132, 226, 0.18);
+  flex-shrink: 0;
+}
+
+.address-count {
+  margin: 0;
+  color: rgba(235, 242, 255, 0.62);
+}
+
+@media (max-width: 900px) {
+  .ipfs-hero,
+  .ipfs-grid,
+  .facts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ipfs-hero,
+  .overview-panel,
+  .identity-panel,
+  .addresses-panel {
+    padding: 20px;
+  }
+
+  .banner-title-row,
+  .panel-heading,
+  .address-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
