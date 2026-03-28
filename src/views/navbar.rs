@@ -1,4 +1,4 @@
-use crate::{accounts::AccountStore, ChainConnection, ConnectionStatus, Route};
+use crate::{accounts::AccountStore, ChainConnection, ConnectionStatus, IpfsConnection, Route};
 use dioxus::prelude::*;
 
 const NAVBAR_CSS: Asset = asset!("/assets/styling/navbar.css");
@@ -7,6 +7,8 @@ const NAVBAR_CSS: Asset = asset!("/assets/styling/navbar.css");
 pub fn Navbar() -> Element {
     let chain_connection = use_context::<Signal<ChainConnection>>();
     let chain_connection = chain_connection();
+    let ipfs_connection = use_context::<Signal<IpfsConnection>>();
+    let ipfs_connection = ipfs_connection();
     let account_store = use_context::<Signal<AccountStore>>();
     let account_store = account_store();
 
@@ -26,6 +28,18 @@ pub fn Navbar() -> Element {
             Some(error) => format!("Reconnecting: {error}"),
             None => "Reconnecting to Acuity".to_string(),
         },
+    };
+
+    let ipfs_status_class = match ipfs_connection.status {
+        ConnectionStatus::Connected => "connected",
+        ConnectionStatus::Connecting => "connecting",
+        ConnectionStatus::Reconnecting => "reconnecting",
+    };
+
+    let ipfs_status_label = match ipfs_connection.status {
+        ConnectionStatus::Connected => "IPFS connected".to_string(),
+        ConnectionStatus::Connecting => "Connecting to IPFS".to_string(),
+        ConnectionStatus::Reconnecting => "Reconnecting to IPFS".to_string(),
     };
 
     let active_account = account_store.active_account().cloned();
@@ -69,6 +83,10 @@ pub fn Navbar() -> Element {
                 div {
                     class: "chain-status {status_class}",
                     "{status_label}"
+                }
+                div {
+                    class: "ipfs-status {ipfs_status_class}",
+                    "{ipfs_status_label}"
                 }
             }
         }

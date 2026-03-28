@@ -48,7 +48,8 @@
   color: #dfe7fb;
 }
 
-.chain-status {
+.chain-status,
+.ipfs-status {
   padding: 8px 12px;
   border-radius: 999px;
   font-size: 0.95rem;
@@ -79,14 +80,17 @@
   border-color: rgba(192, 105, 48, 0.26);
 }
 
-.chain-status.connected {
+.chain-status.connected,
+.ipfs-status.connected {
   color: #dbffe4;
   background: rgba(78, 183, 104, 0.12);
   border-color: rgba(78, 183, 104, 0.22);
 }
 
 .chain-status.connecting,
-.chain-status.reconnecting {
+.chain-status.reconnecting,
+.ipfs-status.connecting,
+.ipfs-status.reconnecting {
   color: #fff3d4;
   background: rgba(212, 154, 42, 0.12);
   border-color: rgba(212, 154, 42, 0.22);
@@ -108,6 +112,7 @@
   }
 
   .chain-status,
+  .ipfs-status,
   .account-status {
     white-space: normal;
     max-width: none;

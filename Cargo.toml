@@ -13,6 +13,7 @@ base64 = "0.22"
 crypto_secretbox = { version = "0.1.1", features = ["alloc", "salsa20"] }
 home = "0.5"
 rand = "0.8"
+reqwest = { version = "0.12", features = ["json"] }
 scrypt = "0.11"
 schnorrkel = "0.11.4"
 serde = { version = "1", features = ["derive"] }
