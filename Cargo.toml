@@ -9,7 +9,17 @@ edition = "2021"
 [dependencies]
 dioxus = { version = "0.7.1", features = ["router"] }
 futures = "0.3"
+base64 = "0.22"
+crypto_secretbox = { version = "0.1.1", features = ["alloc", "salsa20"] }
+home = "0.5"
+rand = "0.8"
+scrypt = "0.11"
+schnorrkel = "0.11.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sp-core = { version = "39.0.0", features = ["std"] }
 subxt = { version = "0.50.0", features = ["native"] }
+subxt-signer = { version = "0.50.0", default-features = false, features = ["polkadot-js-compat"] }
 tokio = { version = "1", features = ["time"] }
 
 [features]

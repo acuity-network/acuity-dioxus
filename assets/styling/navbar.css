@@ -20,6 +20,15 @@
   gap: 20px;
 }
 
+.nav-statuses {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .brand {
   font-size: 1rem;
   font-weight: 700;
@@ -47,6 +56,29 @@
   border: 1px solid transparent;
 }
 
+.account-status {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-status.unlocked {
+  color: #dbfff5;
+  background: rgba(42, 178, 154, 0.12);
+  border-color: rgba(42, 178, 154, 0.22);
+}
+
+.account-status.locked {
+  color: #fde6d4;
+  background: rgba(192, 105, 48, 0.14);
+  border-color: rgba(192, 105, 48, 0.26);
+}
+
 .chain-status.connected {
   color: #dbffe4;
   background: rgba(78, 183, 104, 0.12);
@@ -70,7 +102,14 @@
     gap: 14px;
   }
 
-  .chain-status {
+  .nav-statuses {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .chain-status,
+  .account-status {
     white-space: normal;
+    max-width: none;
   }
 }

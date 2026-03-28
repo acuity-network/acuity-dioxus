@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use std::time::Duration;
 use subxt::{OnlineClient, PolkadotConfig};
 
+use accounts::load_account_store;
 use views::{Home, Navbar};
 
 const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
@@ -53,6 +54,7 @@ enum ConnectionStatus {
     Reconnecting,
 }
 
+mod accounts;
 mod views;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -74,7 +76,9 @@ fn main() {
 #[component]
 fn App() -> Element {
     let chain_connection = use_signal(ChainConnection::default);
+    let account_store = use_signal(load_account_store);
     use_context_provider(|| chain_connection);
+    use_context_provider(|| account_store);
 
     let _connection_task = use_hook(move || {
         let chain_connection = chain_connection;
@@ -115,9 +119,7 @@ async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
     }
 }
 
-async fn stream_best_blocks(
-    mut chain_connection: Signal<ChainConnection>,
-) -> Result<(), String> {
+async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Result<(), String> {
     let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
         .await
         .map_err(|error| format!("Failed to connect to {ACUITY_NODE_URL}: {error}"))?;
