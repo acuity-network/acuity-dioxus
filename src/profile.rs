@@ -831,3 +831,240 @@ struct BuiltImageMixin {
     payload: Vec<u8>,
     preview_data_url: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{env, fs, path::PathBuf, process};
+
+    fn unique_test_dir(label: &str) -> PathBuf {
+        let unique = format!(
+            "acuity-dioxus-profile-{label}-{}-{}",
+            process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_millis())
+                .unwrap_or_default()
+        );
+        env::temp_dir().join(unique)
+    }
+
+    fn write_test_image(path: &Path, format: ImageFormat) {
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(
+            2,
+            2,
+            Rgba([12, 34, 56, 255]),
+        ));
+        image.save_with_format(path, format).unwrap();
+    }
+
+    fn decode_item(bytes: &[u8]) -> ItemMessage {
+        ItemMessage::decode(bytes).unwrap()
+    }
+
+    #[test]
+    fn preview_data_url_for_path_uses_expected_mime_types() {
+        let test_dir = unique_test_dir("preview-mime");
+        fs::create_dir_all(&test_dir).unwrap();
+
+        let cases = [
+            ("image.png", ImageFormat::Png, "data:image/png;base64,"),
+            ("image.gif", ImageFormat::Gif, "data:image/gif;base64,"),
+            ("image.bmp", ImageFormat::Bmp, "data:image/bmp;base64,"),
+            ("image.webp", ImageFormat::WebP, "data:image/webp;base64,"),
+            ("image.tiff", ImageFormat::Tiff, "data:image/tiff;base64,"),
+        ];
+
+        for (file_name, format, expected_prefix) in cases {
+            let path = test_dir.join(file_name);
+            write_test_image(&path, format);
+            let data_url = preview_data_url_for_path(&path).unwrap();
+            assert!(data_url.starts_with(expected_prefix), "{file_name}: {data_url}");
+        }
+
+        fs::remove_dir_all(&test_dir).unwrap();
+    }
+
+    #[test]
+    fn preview_data_url_for_path_defaults_to_jpeg_for_unknown_bytes() {
+        let test_dir = unique_test_dir("preview-fallback");
+        fs::create_dir_all(&test_dir).unwrap();
+        let path = test_dir.join("unknown.bin");
+        fs::write(&path, b"not an image format").unwrap();
+
+        let data_url = preview_data_url_for_path(&path).unwrap();
+
+        assert!(data_url.starts_with("data:image/jpeg;base64,"));
+
+        fs::remove_dir_all(&test_dir).unwrap();
+    }
+
+    #[test]
+    fn preview_data_url_for_path_reports_read_errors() {
+        let path = unique_test_dir("missing-image").join("missing.png");
+
+        let error = preview_data_url_for_path(&path).unwrap_err();
+
+        assert!(error.contains("Failed to read image"));
+        assert!(error.contains("missing.png"));
+    }
+
+    #[test]
+    fn encode_profile_item_includes_required_mixins_without_image() {
+        let draft = ProfileDraft {
+            name: "Alice".to_string(),
+            bio: "Hello".to_string(),
+            location: "Earth".to_string(),
+            account_type: AccountType::Project as u32,
+        };
+
+        let item = decode_item(&encode_profile_item(&draft, None));
+
+        assert_eq!(item.mixin_payload.len(), 4);
+        assert_eq!(
+            decode_single_mixin::<ProfileMixinMessage>(&item, PROFILE_MIXIN_ID),
+            Some(ProfileMixinMessage {
+                account_type: AccountType::Project as i32,
+                location: "Earth".to_string(),
+            })
+        );
+        assert_eq!(
+            decode_single_mixin::<LanguageMixinMessage>(&item, LANGUAGE_MIXIN_ID),
+            Some(LanguageMixinMessage {
+                language_tag: "en".to_string(),
+            })
+        );
+        assert_eq!(
+            decode_single_mixin::<TitleMixinMessage>(&item, TITLE_MIXIN_ID),
+            Some(TitleMixinMessage {
+                title: "Alice".to_string(),
+            })
+        );
+        assert_eq!(
+            decode_single_mixin::<BodyTextMixinMessage>(&item, BODY_TEXT_MIXIN_ID),
+            Some(BodyTextMixinMessage {
+                body_text: "Hello".to_string(),
+            })
+        );
+        assert_eq!(decode_single_mixin::<ImageMixinMessage>(&item, IMAGE_MIXIN_ID), None);
+    }
+
+    #[test]
+    fn encode_profile_item_includes_optional_image_payload() {
+        let draft = ProfileDraft::default();
+        let image_payload = vec![1, 2, 3, 4];
+
+        let item = decode_item(&encode_profile_item(&draft, Some(image_payload.clone())));
+
+        let image_mixin = item
+            .mixin_payload
+            .iter()
+            .find(|mixin| mixin.mixin_id == IMAGE_MIXIN_ID)
+            .unwrap();
+        assert_eq!(image_mixin.payload, image_payload);
+    }
+
+    #[test]
+    fn encode_profile_item_falls_back_to_anon_for_out_of_range_account_type() {
+        let draft = ProfileDraft {
+            account_type: u32::MAX,
+            ..ProfileDraft::default()
+        };
+
+        let item = decode_item(&encode_profile_item(&draft, None));
+        let profile = decode_single_mixin::<ProfileMixinMessage>(&item, PROFILE_MIXIN_ID).unwrap();
+
+        assert_eq!(profile.account_type, AccountType::Anon as i32);
+    }
+
+    #[test]
+    fn decode_single_mixin_returns_none_for_missing_or_invalid_payload() {
+        let item = ItemMessage {
+            mixin_payload: vec![MixinPayloadMessage {
+                mixin_id: TITLE_MIXIN_ID,
+                payload: vec![0xff, 0x00],
+            }],
+        };
+
+        assert_eq!(decode_single_mixin::<TitleMixinMessage>(&item, BODY_TEXT_MIXIN_ID), None);
+        assert_eq!(decode_single_mixin::<TitleMixinMessage>(&item, TITLE_MIXIN_ID), None);
+    }
+
+    #[test]
+    fn encode_as_jpeg_returns_decodable_jpeg_bytes() {
+        let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(
+            4,
+            3,
+            Rgba([100, 150, 200, 255]),
+        ));
+
+        let jpeg = encode_as_jpeg(&image).unwrap();
+        let format = image::guess_format(&jpeg).unwrap();
+        let decoded = image::load_from_memory(&jpeg).unwrap();
+
+        assert_eq!(format, ImageFormat::Jpeg);
+        assert_eq!(decoded.dimensions(), (4, 3));
+    }
+
+    #[test]
+    fn derive_item_id_is_deterministic_and_nonce_sensitive() {
+        let account_id = AccountId32::new([7; 32]);
+        let nonce_a = [1; 32];
+        let nonce_b = [2; 32];
+
+        let first = derive_item_id(account_id.clone(), nonce_a);
+        let second = derive_item_id(account_id.clone(), nonce_a);
+        let third = derive_item_id(account_id, nonce_b);
+
+        assert_eq!(first, second);
+        assert_ne!(first, third);
+    }
+
+    #[test]
+    fn account_id_from_ss58_round_trips_and_reports_invalid_input() {
+        let original = AccountId32::new([9; 32]);
+        let address = original.to_ss58check();
+
+        assert_eq!(account_id_from_ss58(&address).unwrap(), original);
+
+        let error = account_id_from_ss58("not-a-valid-address").unwrap_err();
+        assert!(error.contains("Failed to decode account address not-a-valid-address"));
+    }
+
+    #[test]
+    fn bytes32_hex_helpers_round_trip_and_validate_lengths() {
+        let bytes = [0xab; 32];
+        let encoded = bytes32_to_hex(&bytes);
+
+        assert_eq!(encoded, format!("0x{}", "ab".repeat(32)));
+        assert_eq!(hex_to_bytes32(&encoded).unwrap(), bytes);
+        assert_eq!(hex_to_bytes32(&encoded[2..]).unwrap(), bytes);
+
+        let invalid_hex = hex_to_bytes32("0xzz").unwrap_err();
+        assert!(invalid_hex.contains("Invalid hex value 0xzz"));
+
+        let wrong_length = hex_to_bytes32("0x1234").unwrap_err();
+        assert_eq!(wrong_length, "Expected 32 bytes for 0x1234.");
+    }
+
+    #[test]
+    fn digest_hex_and_cid_helpers_round_trip() {
+        let digest_hex = format!("0x{}", "11".repeat(32));
+
+        let cid = digest_hex_to_cid(&digest_hex).unwrap();
+        let round_trip = cid_to_digest_hex(&cid).unwrap();
+
+        assert_eq!(round_trip, digest_hex);
+    }
+
+    #[test]
+    fn cid_to_digest_hex_rejects_invalid_multihash_shape() {
+        let not_sha2_256 = bs58::encode([0x13_u8, 0x20].into_iter().chain([0_u8; 32]).collect::<Vec<_>>())
+            .into_string();
+        let error = cid_to_digest_hex(&not_sha2_256).unwrap_err();
+
+        assert!(error.contains("is not a sha2-256 CIDv0 multihash"));
+    }
+}
