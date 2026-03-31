@@ -7,9 +7,11 @@ use fast_qr::{
     convert::{svg::SvgBuilder, Builder, Shape},
     QRBuilder,
 };
+use std::{collections::{HashMap, HashSet}, time::Duration};
 use subxt::{dynamic, utils::AccountId32, OnlineClient, PolkadotConfig};
 
 const MANAGE_ACCOUNTS_CSS: Asset = asset!("/assets/styling/manage_accounts.css");
+const BALANCE_RECONNECT_DELAY: Duration = Duration::from_secs(2);
 
 // ── Balance helpers ───────────────────────────────────────────────────────────
 
@@ -27,6 +29,41 @@ impl Default for TokenFormat {
         }
     }
 }
+
+#[derive(Clone, PartialEq)]
+struct BalanceState {
+    value: Option<u128>,
+    error: Option<String>,
+    loading: bool,
+}
+
+impl BalanceState {
+    fn loading() -> Self {
+        Self {
+            value: None,
+            error: None,
+            loading: true,
+        }
+    }
+
+    fn ready(value: u128) -> Self {
+        Self {
+            value: Some(value),
+            error: None,
+            loading: false,
+        }
+    }
+
+    fn failed(error: String) -> Self {
+        Self {
+            value: None,
+            error: Some(error),
+            loading: false,
+        }
+    }
+}
+
+type BalanceStore = Signal<HashMap<String, BalanceState>>;
 
 fn format_balance(raw: u128, fmt: &TokenFormat) -> String {
     if fmt.decimals == 0 {
@@ -54,14 +91,13 @@ fn decode_ss58(address: &str) -> Result<[u8; 32], String> {
 }
 
 /// Query free balance for a given SS58 address using dynamic value decoding.
-async fn fetch_balance(address: String) -> Result<u128, String> {
+async fn fetch_balance_with_client(
+    client: &OnlineClient<PolkadotConfig>,
+    address: &str,
+) -> Result<u128, String> {
     use subxt::dynamic::Value;
 
-    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
-        .await
-        .map_err(|e| format!("Connection failed: {e}"))?;
-
-    let addr_bytes = decode_ss58(&address)?;
+    let addr_bytes = decode_ss58(address)?;
     let account_id = AccountId32(addr_bytes);
 
     // Use the Value-typed dynamic storage query (no custom decode type needed)
@@ -92,6 +128,220 @@ async fn fetch_balance(address: String) -> Result<u128, String> {
         .ok_or_else(|| "Could not read free balance from account storage value".to_string())?;
 
     Ok(free)
+}
+
+fn render_balance(balance: Option<&BalanceState>, fmt: &TokenFormat) -> Element {
+    match balance {
+        None => rsx! { span { class: "ma-loading", "…" } },
+        Some(balance) if balance.loading => rsx! { span { class: "ma-loading", "…" } },
+        Some(balance) => {
+            if let Some(raw) = balance.value {
+                let label = format_balance(raw, fmt);
+                rsx! { span { "{label}" } }
+            } else if let Some(error) = balance.error.as_deref() {
+                rsx! { span { class: "ma-error-cell", title: "{error}", "Error" } }
+            } else {
+                rsx! { span { class: "ma-loading", "…" } }
+            }
+        }
+    }
+}
+
+fn format_balance_label(balance: Option<&BalanceState>, fmt: &TokenFormat) -> String {
+    match balance {
+        None => "Loading…".to_string(),
+        Some(balance) if balance.loading => "Loading…".to_string(),
+        Some(balance) => {
+            if let Some(raw) = balance.value {
+                format_balance(raw, fmt)
+            } else if let Some(error) = balance.error.as_deref() {
+                format!("Error: {error}")
+            } else {
+                "Loading…".to_string()
+            }
+        }
+    }
+}
+
+async fn watch_balances(mut balances: BalanceStore, addresses: Vec<String>) {
+    if addresses.is_empty() {
+        balances.set(HashMap::new());
+        return;
+    }
+
+    loop {
+        match maintain_balance_subscription(balances, &addresses).await {
+            Ok(()) => return,
+            Err(error) => {
+                balances.with_mut(|store| {
+                    for address in &addresses {
+                        store.insert(address.clone(), BalanceState::failed(error.clone()));
+                    }
+                });
+                tokio::time::sleep(BALANCE_RECONNECT_DELAY).await;
+            }
+        }
+    }
+}
+
+async fn maintain_balance_subscription(
+    mut balances: BalanceStore,
+    addresses: &[String],
+) -> Result<(), String> {
+
+    let tracked_accounts = addresses
+        .iter()
+        .map(|address| decode_ss58(address).map(|bytes| (bytes, address.clone())))
+        .collect::<Result<HashMap<_, _>, _>>()
+        .map_err(|error| error.to_string())?;
+
+    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
+        .await
+        .map_err(|error| format!("Connection failed: {error}"))?;
+
+    for address in addresses {
+        match fetch_balance_with_client(&client, address).await {
+            Ok(value) => balances.with_mut(|store| {
+                store.insert(address.clone(), BalanceState::ready(value));
+            }),
+            Err(error) => balances.with_mut(|store| {
+                store.insert(address.clone(), BalanceState::failed(error));
+            }),
+        }
+    }
+
+    let mut blocks = client
+        .stream_blocks()
+        .await
+        .map_err(|error| format!("Failed to subscribe to finalized blocks: {error}"))?;
+
+    while let Some(block) = blocks.next().await {
+        let block = block.map_err(|error| format!("Failed to read finalized block: {error}"))?;
+
+        let at = block
+            .at()
+            .await
+            .map_err(|error| format!("Failed to inspect finalized block: {error}"))?;
+
+        let events = at
+            .events()
+            .fetch()
+            .await
+            .map_err(|error| format!("Failed to fetch finalized block events: {error}"))?;
+
+        let mut changed_addresses = HashSet::new();
+        for event in events.iter() {
+            let event = event
+                .map_err(|error| format!("Failed to decode finalized block event: {error}"))?;
+
+            match (event.pallet_name(), event.event_name()) {
+                ("Balances", "Transfer") => {
+                    track_event_accounts::<(AccountId32, AccountId32, u128)>(
+                        &event,
+                        &tracked_accounts,
+                        &mut changed_addresses,
+                        &[0, 1],
+                    );
+                }
+                ("Balances", "Deposit")
+                | ("Balances", "Withdraw")
+                | ("Balances", "Slashed")
+                | ("Balances", "Minted")
+                | ("Balances", "Burned") => {
+                    track_event_accounts::<(AccountId32, u128)>(
+                        &event,
+                        &tracked_accounts,
+                        &mut changed_addresses,
+                        &[0],
+                    );
+                }
+                ("Balances", "DustLost")
+                | ("Balances", "Endowed") => {
+                    track_event_accounts::<(AccountId32, u128)>(
+                        &event,
+                        &tracked_accounts,
+                        &mut changed_addresses,
+                        &[0],
+                    );
+                }
+                ("System", "KilledAccount") | ("System", "NewAccount") => {
+                    track_event_accounts::<(AccountId32,)>(
+                        &event,
+                        &tracked_accounts,
+                        &mut changed_addresses,
+                        &[0],
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        for address in changed_addresses {
+            match fetch_balance_with_client(&client, &address).await {
+                Ok(value) => balances.with_mut(|store| {
+                    store.insert(address.clone(), BalanceState::ready(value));
+                }),
+                Err(error) => balances.with_mut(|store| {
+                    store.insert(address.clone(), BalanceState::failed(error));
+                }),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn track_event_accounts<E>(
+    event: &subxt::events::Event<PolkadotConfig>,
+    tracked_accounts: &HashMap<[u8; 32], String>,
+    changed_addresses: &mut HashSet<String>,
+    indexes: &[usize],
+) where
+    E: parity_scale_codec::Decode + subxt::ext::scale_decode::DecodeAsFields + EventAccounts,
+{
+    let Ok(decoded) = event.decode_fields_unchecked_as::<E>() else {
+        return;
+    };
+
+    for account in account_ids_from_tuple(&decoded, indexes) {
+        if let Some(address) = tracked_accounts.get(&account) {
+            changed_addresses.insert(address.clone());
+        }
+    }
+}
+
+trait EventAccounts {
+    fn account_ids(&self) -> Vec<[u8; 32]>;
+}
+
+impl EventAccounts for (AccountId32,) {
+    fn account_ids(&self) -> Vec<[u8; 32]> {
+        vec![self.0 .0]
+    }
+}
+
+impl EventAccounts for (AccountId32, u128) {
+    fn account_ids(&self) -> Vec<[u8; 32]> {
+        vec![self.0 .0]
+    }
+}
+
+impl EventAccounts for (AccountId32, AccountId32, u128) {
+    fn account_ids(&self) -> Vec<[u8; 32]> {
+        vec![self.0 .0, self.1 .0]
+    }
+}
+
+fn account_ids_from_tuple<E>(decoded: &E, indexes: &[usize]) -> Vec<[u8; 32]>
+where
+    E: EventAccounts,
+{
+    decoded
+        .account_ids()
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, account)| indexes.contains(&index).then_some(account))
+        .collect()
 }
 
 /// Walk a scale_value::Value composite to extract the `data.free` field as u128.
@@ -129,6 +379,29 @@ pub fn ManageAccounts() -> Element {
     let snap = account_store();
 
     let mut dialog = use_signal(|| Dialog::None);
+    let balances: BalanceStore = use_signal(HashMap::new);
+    let addresses: Vec<String> = snap
+        .accounts
+        .iter()
+        .map(|account| account.address.clone())
+        .collect();
+
+    use_effect(move || {
+        let addresses = addresses.clone();
+        let mut balances = balances;
+
+        balances.with_mut(|store| {
+            let address_set: HashSet<&str> = addresses.iter().map(String::as_str).collect();
+            store.retain(|address, _| address_set.contains(address.as_str()));
+            for address in &addresses {
+                store.entry(address.clone()).or_insert_with(BalanceState::loading);
+            }
+        });
+
+        spawn(async move {
+            watch_balances(balances, addresses).await;
+        });
+    });
 
     // Derive token format from chain properties; fall back to generic defaults.
     let chain_connection = use_context::<Signal<ChainConnection>>();
@@ -188,21 +461,7 @@ pub fn ManageAccounts() -> Element {
                                     let is_locked = !snap.is_account_unlocked(&account.id);
                                     let address = account.address.clone();
                                     let fmt_clone = fmt.clone();
-
-                                    // Per-row balance resource — keyed by address
-                                    let balance_resource = use_resource(move || {
-                                        let addr = address.clone();
-                                        async move { fetch_balance(addr).await }
-                                    });
-
-                                    let balance_cell = match balance_resource() {
-                                        None => rsx! { span { class: "ma-loading", "…" } },
-                                        Some(Ok(raw)) => {
-                                            let label = format_balance(raw, &fmt_clone);
-                                            rsx! { span { "{label}" } }
-                                        }
-                                        Some(Err(e)) => rsx! { span { class: "ma-error-cell", title: "{e}", "Error" } },
-                                    };
+                                    let balance_cell = render_balance(balances.read().get(&address), &fmt_clone);
 
                                     rsx! {
                                         tr { key: "{account_id}",
@@ -256,6 +515,7 @@ pub fn ManageAccounts() -> Element {
                             account_name: acct.name.clone(),
                             address: acct.address.clone(),
                             token_fmt: fmt.clone(),
+                            balance: balances.read().get(&acct.address).cloned(),
                             on_close: move |_| dialog.set(Dialog::None),
                         }
                     }
@@ -290,22 +550,12 @@ fn FundDialog(
     account_name: String,
     address: String,
     token_fmt: TokenFormat,
+    balance: Option<BalanceState>,
     on_close: EventHandler<()>,
 ) -> Element {
     let qr = qr_svg(&address);
     let fmt = token_fmt.clone();
-    let addr_clone = address.clone();
-
-    let balance_resource = use_resource(move || {
-        let addr = addr_clone.clone();
-        async move { fetch_balance(addr).await }
-    });
-
-    let balance_label = match balance_resource() {
-        None => "Loading…".to_string(),
-        Some(Ok(raw)) => format_balance(raw, &fmt),
-        Some(Err(e)) => format!("Error: {e}"),
-    };
+    let balance_label = format_balance_label(balance.as_ref(), &fmt);
 
     rsx! {
         div {
