@@ -3,7 +3,9 @@ use futures::{SinkExt, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
-use subxt::{OnlineClient, PolkadotConfig};
+use subxt::{
+    config::RpcConfigFor, rpcs::methods::legacy::LegacyRpcMethods, OnlineClient, PolkadotConfig,
+};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use accounts::load_account_store;
@@ -20,21 +22,23 @@ const RECONNECT_DELAY: Duration = Duration::from_secs(2);
 const IPFS_HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone, PartialEq)]
-struct ChainConnection {
-    details: ChainDetails,
-    status: ConnectionStatus,
-    last_error: Option<String>,
+pub(crate) struct ChainConnection {
+    pub(crate) details: ChainDetails,
+    pub(crate) status: ConnectionStatus,
+    pub(crate) last_error: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Default)]
-struct ChainDetails {
-    best_block_number: Option<String>,
-    best_block_hash: Option<String>,
-    finalized_block_number: Option<String>,
-    finalized_block_hash: Option<String>,
-    genesis_hash: Option<String>,
-    spec_version: Option<u32>,
-    transaction_version: Option<u32>,
+pub(crate) struct ChainDetails {
+    pub(crate) best_block_number: Option<String>,
+    pub(crate) best_block_hash: Option<String>,
+    pub(crate) finalized_block_number: Option<String>,
+    pub(crate) finalized_block_hash: Option<String>,
+    pub(crate) genesis_hash: Option<String>,
+    pub(crate) spec_version: Option<u32>,
+    pub(crate) transaction_version: Option<u32>,
+    pub(crate) token_symbol: Option<String>,
+    pub(crate) token_decimals: Option<u8>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -313,6 +317,36 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
         .await
         .map_err(|error| format!("Failed to inspect the latest finalized block: {error}"))?;
 
+    // Fetch token symbol and decimals from chain system properties.
+    let (token_symbol, token_decimals) = {
+        let rpc_client = subxt::rpcs::RpcClient::from_insecure_url(ACUITY_NODE_URL)
+            .await
+            .map_err(|error| format!("Failed to connect RPC client: {error}"))?;
+        let legacy = LegacyRpcMethods::<RpcConfigFor<PolkadotConfig>>::new(rpc_client);
+        match legacy.system_properties().await {
+            Ok(props) => {
+                let symbol = props
+                    .get("tokenSymbol")
+                    .and_then(|v: &serde_json::Value| {
+                        // May be a string or a single-element array.
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.as_array()?.first()?.as_str().map(|s| s.to_string()))
+                    });
+                let decimals = props
+                    .get("tokenDecimals")
+                    .and_then(|v: &serde_json::Value| {
+                        // May be a number or a single-element array.
+                        v.as_u64()
+                            .or_else(|| v.as_array()?.first()?.as_u64())
+                            .map(|n| n as u8)
+                    });
+                (symbol, decimals)
+            }
+            Err(_) => (None, None),
+        }
+    };
+
     let mut details = chain_connection().details.clone();
     let finalized_block_number = finalized_block.block_number().to_string();
     let finalized_block_hash = finalized_block.block_hash().to_string();
@@ -324,6 +358,8 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
     details.genesis_hash = Some(client.genesis_hash().to_string());
     details.spec_version = Some(finalized_block.spec_version());
     details.transaction_version = Some(finalized_block.transaction_version());
+    details.token_symbol = token_symbol;
+    details.token_decimals = token_decimals;
     chain_connection.set(ChainConnection::connected(details));
 
     let mut best_blocks = client

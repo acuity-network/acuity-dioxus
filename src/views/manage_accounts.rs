@@ -1,13 +1,13 @@
 use crate::{
     accounts::{create_account, delete_account, AccountStore},
-    Route, ACUITY_NODE_URL,
+    ChainConnection, Route, ACUITY_NODE_URL,
 };
 use dioxus::prelude::*;
 use fast_qr::{
     convert::{svg::SvgBuilder, Builder, Shape},
     QRBuilder,
 };
-use subxt::{dynamic, OnlineClient, PolkadotConfig};
+use subxt::{dynamic, utils::AccountId32, OnlineClient, PolkadotConfig};
 
 const MANAGE_ACCOUNTS_CSS: Asset = asset!("/assets/styling/manage_accounts.css");
 
@@ -22,8 +22,8 @@ struct TokenFormat {
 impl Default for TokenFormat {
     fn default() -> Self {
         Self {
-            decimals: 18,
-            symbol: "ACU".to_string(),
+            decimals: 12,
+            symbol: "UNIT".to_string(),
         }
     }
 }
@@ -62,9 +62,10 @@ async fn fetch_balance(address: String) -> Result<u128, String> {
         .map_err(|e| format!("Connection failed: {e}"))?;
 
     let addr_bytes = decode_ss58(&address)?;
+    let account_id = AccountId32(addr_bytes);
 
     // Use the Value-typed dynamic storage query (no custom decode type needed)
-    let storage_addr = dynamic::storage::<([u8; 32],), Value>("System", "Account");
+    let storage_addr = dynamic::storage::<(AccountId32,), Value>("System", "Account");
 
     let at_block = client
         .at_current_block()
@@ -74,7 +75,7 @@ async fn fetch_balance(address: String) -> Result<u128, String> {
     // try_fetch returns None if the account doesn't exist yet (zero balance)
     let maybe_value = at_block
         .storage()
-        .try_fetch(storage_addr, (addr_bytes,))
+        .try_fetch(storage_addr, (account_id,))
         .await
         .map_err(|e| format!("Storage query failed: {e}"))?;
 
@@ -129,8 +130,18 @@ pub fn ManageAccounts() -> Element {
 
     let mut dialog = use_signal(|| Dialog::None);
 
-    // Default token format — ACU uses 18 decimals
-    let fmt = TokenFormat::default();
+    // Derive token format from chain properties; fall back to generic defaults.
+    let chain_connection = use_context::<Signal<ChainConnection>>();
+    let fmt = {
+        let details = &chain_connection().details;
+        TokenFormat {
+            symbol: details
+                .token_symbol
+                .clone()
+                .unwrap_or_else(|| "UNIT".to_string()),
+            decimals: details.token_decimals.unwrap_or(12),
+        }
+    };
 
     rsx! {
         document::Link { rel: "stylesheet", href: MANAGE_ACCOUNTS_CSS }
