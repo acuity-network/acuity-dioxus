@@ -262,8 +262,10 @@ pub async fn save_profile(
         .ok_or_else(|| "Select an account before saving a profile.".to_string())?
         .clone();
     let signer = account_store
-        .active_signer
-        .clone()
+        .active_account_id
+        .as_deref()
+        .and_then(|id| account_store.unlocked_signers.get(id))
+        .cloned()
         .ok_or_else(|| "Unlock the active account before saving a profile.".to_string())?;
     let account_id = account_id_from_ss58(&active_account.address)?;
 

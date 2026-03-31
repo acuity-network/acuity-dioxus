@@ -8,6 +8,7 @@ use schnorrkel::{ExpansionMode, MiniSecretKey};
 use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58Codec, sr25519::Pair as Sr25519Pair, Pair};
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -30,15 +31,30 @@ pub struct AccountEntry {
     pub path: PathBuf,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AccountStore {
     pub config_dir: Option<String>,
     pub accounts_dir: Option<String>,
     pub accounts: Vec<AccountEntry>,
     pub active_account_id: Option<String>,
-    pub active_signer: Option<SignerKeypair>,
+    /// Keyed by account `id` — any account can be independently unlocked.
+    pub unlocked_signers: HashMap<String, SignerKeypair>,
     pub notice_message: Option<String>,
     pub error_message: Option<String>,
+}
+
+impl Default for AccountStore {
+    fn default() -> Self {
+        Self {
+            config_dir: None,
+            accounts_dir: None,
+            accounts: Vec::new(),
+            active_account_id: None,
+            unlocked_signers: HashMap::new(),
+            notice_message: None,
+            error_message: None,
+        }
+    }
 }
 
 impl PartialEq for AccountStore {
@@ -47,7 +63,14 @@ impl PartialEq for AccountStore {
             && self.accounts_dir == other.accounts_dir
             && self.accounts == other.accounts
             && self.active_account_id == other.active_account_id
-            && self.active_signer.is_some() == other.active_signer.is_some()
+            // Compare only which IDs are unlocked, not the key material itself
+            && {
+                let mut a: Vec<&String> = self.unlocked_signers.keys().collect();
+                let mut b: Vec<&String> = other.unlocked_signers.keys().collect();
+                a.sort();
+                b.sort();
+                a == b
+            }
             && self.notice_message == other.notice_message
             && self.error_message == other.error_message
     }
@@ -61,7 +84,14 @@ impl AccountStore {
     }
 
     pub fn is_active_unlocked(&self) -> bool {
-        self.active_account_id.is_some() && self.active_signer.is_some()
+        self.active_account_id
+            .as_deref()
+            .map(|id| self.unlocked_signers.contains_key(id))
+            .unwrap_or(false)
+    }
+
+    pub fn is_account_unlocked(&self, id: &str) -> bool {
+        self.unlocked_signers.contains_key(id)
     }
 
     fn set_notice(&mut self, message: impl Into<String>) {
@@ -139,7 +169,7 @@ pub fn load_account_store() -> AccountStore {
         accounts_dir: Some(accounts_dir.display().to_string()),
         accounts,
         active_account_id,
-        active_signer: None,
+        unlocked_signers: HashMap::new(),
         notice_message,
         error_message: None,
     }
@@ -156,7 +186,6 @@ pub fn select_active_account(store: &mut AccountStore, account_id: &str) {
     }
 
     store.active_account_id = Some(account_id.to_string());
-    store.active_signer = None;
     if let Some(account) = store.active_account() {
         store.set_notice(format!("Selected {}.", account.name));
     }
@@ -221,32 +250,32 @@ pub fn create_account(store: &mut AccountStore, name: &str, password: &str) {
     store.accounts.push(account.clone());
     sort_accounts(&mut store.accounts);
     store.active_account_id = Some(account.id.clone());
-    store.active_signer = None;
     store.set_notice(format!("Created {}.", account.name));
 }
 
 /// Run the CPU-heavy scrypt + decrypt on a background thread.
-/// Returns `Ok((signer, account_name))` on success or `Err(message)` on failure.
+/// Returns `Ok((signer, account_id, account_name))` on success or `Err(message)` on failure.
 /// This function is `Send + 'static` so it can be passed to `spawn_blocking`.
 pub fn unlock_account_blocking(
     account_path: PathBuf,
+    account_id: String,
     account_name: String,
     password: String,
-) -> Result<(SignerKeypair, String), String> {
+) -> Result<(SignerKeypair, String, String), String> {
     let account_json = fs::read_to_string(&account_path)
         .map_err(|e| format!("Failed to read account file: {e}"))?;
     let signer = polkadot_js_compat::decrypt_json(&account_json, &password)
         .map_err(|e| format!("Failed to unlock account: {e}"))?;
-    Ok((signer, account_name))
+    Ok((signer, account_id, account_name))
 }
 
 pub fn apply_unlock_result(
     store: &mut AccountStore,
-    result: Result<(SignerKeypair, String), String>,
+    result: Result<(SignerKeypair, String, String), String>,
 ) {
     match result {
-        Ok((signer, name)) => {
-            store.active_signer = Some(signer);
+        Ok((signer, id, name)) => {
+            store.unlocked_signers.insert(id, signer);
             store.set_notice(format!("Unlocked {}.", name));
         }
         Err(message) => store.set_error(message),
@@ -265,21 +294,34 @@ pub fn unlock_active_account(store: &mut AccountStore, password: &str) {
         return;
     };
 
-    let result = unlock_account_blocking(account.path, account.name, password.to_string());
+    let result =
+        unlock_account_blocking(account.path, account.id, account.name, password.to_string());
     apply_unlock_result(store, result);
 }
 
+/// Lock the account with the given id.
+pub fn lock_account(store: &mut AccountStore, account_id: &str) {
+    let name = store
+        .accounts
+        .iter()
+        .find(|a| a.id == account_id)
+        .map(|a| a.name.clone());
+
+    if store.unlocked_signers.remove(account_id).is_some() {
+        if let Some(name) = name {
+            store.set_notice(format!("Locked {}.", name));
+        }
+    } else if let Some(name) = name {
+        store.set_notice(format!("{} is already locked.", name));
+    }
+}
+
 pub fn lock_active_account(store: &mut AccountStore) {
-    let Some(account) = store.active_account().cloned() else {
+    let Some(id) = store.active_account_id.clone() else {
         store.set_error("Select an account first.");
         return;
     };
-
-    if store.active_signer.take().is_some() {
-        store.set_notice(format!("Locked {}.", account.name));
-    } else {
-        store.set_notice(format!("{} is already locked.", account.name));
-    }
+    lock_account(store, &id);
 }
 
 pub fn delete_active_account(store: &mut AccountStore) {
@@ -304,7 +346,7 @@ pub fn delete_active_account(store: &mut AccountStore) {
     }
 
     store.accounts.remove(account_index);
-    store.active_signer = None;
+    store.unlocked_signers.remove(&active_id);
     store.active_account_id = store
         .accounts
         .first()
@@ -511,7 +553,7 @@ mod tests {
             accounts_dir: Some(test_dir.display().to_string()),
             accounts: Vec::new(),
             active_account_id: None,
-            active_signer: None,
+            unlocked_signers: HashMap::new(),
             notice_message: None,
             error_message: None,
         };
@@ -541,7 +583,7 @@ mod tests {
             accounts_dir: Some(test_dir.display().to_string()),
             accounts: Vec::new(),
             active_account_id: None,
-            active_signer: None,
+            unlocked_signers: HashMap::new(),
             notice_message: None,
             error_message: None,
         };

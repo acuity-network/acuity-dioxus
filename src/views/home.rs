@@ -1,6 +1,6 @@
 use crate::accounts::{
     apply_unlock_result, create_account, delete_active_account, lock_active_account,
-    select_active_account, unlock_account_blocking, AccountStore,
+    unlock_account_blocking, AccountStore,
 };
 use dioxus::prelude::*;
 
@@ -39,7 +39,7 @@ pub fn Home() -> Element {
                     h1 { "Manage the dapp's Polkadot-JS accounts" }
                     p {
                         class: "hero-text",
-                        "Accounts live in the dapp config directory and only the active account can be unlocked in memory."
+                        "Accounts live in the dapp config directory. Use the sidebar to switch accounts and lock or unlock them."
                     }
                 }
                 div {
@@ -169,7 +169,7 @@ pub fn Home() -> Element {
                                     unlocking.set(true);
                                     spawn(async move {
                                         let result = tokio::task::spawn_blocking(move || {
-                                            unlock_account_blocking(account.path, account.name, password)
+                                            unlock_account_blocking(account.path, account.id, account.name, password)
                                         })
                                         .await
                                         .unwrap_or_else(|e| Err(format!("Unlock task panicked: {e}")));
@@ -201,70 +201,6 @@ pub fn Home() -> Element {
                     }
                 }
             }
-
-            section {
-                class: "panel list-panel",
-                div {
-                    class: "panel-heading",
-                    div {
-                        p { class: "panel-label", "Accounts" }
-                        h2 { "Stored accounts" }
-                    }
-                    p { class: "account-count", "{account_snapshot.accounts.len()} total" }
-                }
-
-                if account_snapshot.accounts.is_empty() {
-                    div {
-                        class: "empty-state",
-                        "No account files found yet."
-                    }
-                } else {
-                    div {
-                        class: "account-list",
-                        for account in account_snapshot.accounts.clone() {
-                            button {
-                                class: if account_snapshot.active_account_id.as_deref() == Some(account.id.as_str()) {
-                                    "account-row active"
-                                } else {
-                                    "account-row"
-                                },
-                                onclick: {
-                                    let account_id = account.id.clone();
-                                    move |_| {
-                                        account_store.with_mut(|store| select_active_account(store, &account_id));
-                                        unlock_password.set(String::new());
-                                    }
-                                },
-                                div {
-                                    class: "account-row-copy",
-                                    span { class: "account-name", "{account.name}" }
-                                    span { class: "account-short-address", "{short_address(&account.address)}" }
-                                }
-                                span {
-                                    class: if account_snapshot.active_account_id.as_deref() == Some(account.id.as_str()) {
-                                        if is_active_unlocked { "row-status unlocked" } else { "row-status locked" }
-                                    } else {
-                                        "row-status idle"
-                                    },
-                                    if account_snapshot.active_account_id.as_deref() == Some(account.id.as_str()) {
-                                        if is_active_unlocked { "Active and unlocked" } else { "Active" }
-                                    } else {
-                                        "Select"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
-}
-
-fn short_address(address: &str) -> String {
-    if address.len() <= 14 {
-        return address.to_string();
-    }
-
-    format!("{}...{}", &address[..6], &address[address.len() - 6..])
 }
