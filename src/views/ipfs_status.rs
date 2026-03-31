@@ -11,22 +11,10 @@ pub fn IpfsStatus() -> Element {
     let ipfs_connection = use_context::<Signal<IpfsConnection>>();
     let ipfs_connection = ipfs_connection();
 
-    let (status_badge_class, status_label, status_copy) = match ipfs_connection.status {
-        ConnectionStatus::Connected => (
-            "connected",
-            "Connected",
-            "The daemon is responding to live health checks and publishing peer metadata.",
-        ),
-        ConnectionStatus::Connecting => (
-            "connecting",
-            "Connecting",
-            "The app is dialing the local daemon and waiting for the next successful identity check.",
-        ),
-        ConnectionStatus::Reconnecting => (
-            "reconnecting",
-            "Reconnecting",
-            "The last health check failed, so the app is retrying until the daemon comes back.",
-        ),
+    let (status_badge_class, status_label) = match ipfs_connection.status {
+        ConnectionStatus::Connected => ("connected", "Connected"),
+        ConnectionStatus::Connecting => ("connecting", "Connecting"),
+        ConnectionStatus::Reconnecting => ("reconnecting", "Reconnecting"),
     };
 
     let daemon_agent = ipfs_connection
@@ -65,25 +53,23 @@ pub fn IpfsStatus() -> Element {
 
         div {
             class: "ipfs-shell",
-            section {
-                class: "ipfs-hero panel-surface",
+
+            // ── Compact status bar ──────────────────────────────────────────
+            div {
+                class: "status-bar panel-surface",
                 div {
-                    class: "hero-copy",
-                    p { class: "eyebrow", "IPFS control plane" }
-                    h1 { "Monitor the local daemon in real time" }
-                    p {
-                        class: "hero-text",
-                        "This page reflects the same background health checks that drive the IPFS pill in the header, with the latest identity payload exposed in full."
+                    class: "status-bar-left",
+                    div { class: "status-badge {status_badge_class}", "{status_label}" }
+                    div {
+                        class: "status-bar-title",
+                        span { class: "status-bar-name", "Acuity IPFS Daemon" }
+                        span { class: "status-bar-url", "{IPFS_API_URL}" }
                     }
                 }
                 div {
-                    class: "hero-status-card",
-                    p { class: "label", "Live status" }
-                    div {
-                        class: "status-badge {status_badge_class}",
-                        "{status_label}"
-                    }
-                    p { class: "status-copy", "{status_copy}" }
+                    class: "status-bar-right",
+                    span { class: "status-bar-meta-label", "Reconnect delay" }
+                    span { class: "status-bar-meta-value", "{RECONNECT_DELAY.as_secs()}s" }
                 }
             }
 

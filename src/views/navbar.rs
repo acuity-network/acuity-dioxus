@@ -14,22 +14,8 @@ const SIDEBAR_CSS: Asset = asset!("/assets/styling/sidebar.css");
 
 #[component]
 pub fn Navbar() -> Element {
-    let ipfs_connection = use_context::<Signal<IpfsConnection>>();
-    let ipfs_connection = ipfs_connection();
     let account_store = use_context::<Signal<AccountStore>>();
     let account_store_snap = account_store();
-
-    let ipfs_status_class = match ipfs_connection.status {
-        ConnectionStatus::Connected => "connected",
-        ConnectionStatus::Connecting => "connecting",
-        ConnectionStatus::Reconnecting => "reconnecting",
-    };
-
-    let ipfs_status_label = match ipfs_connection.status {
-        ConnectionStatus::Connected => "IPFS connected".to_string(),
-        ConnectionStatus::Connecting => "Connecting to IPFS".to_string(),
-        ConnectionStatus::Reconnecting => "Reconnecting to IPFS".to_string(),
-    };
 
     let active_account = account_store_snap.active_account().cloned();
     let account_status_class = if account_store_snap.is_active_unlocked() {
@@ -78,11 +64,6 @@ pub fn Navbar() -> Element {
                     class: "account-status {account_status_class}",
                     "{account_label}"
                 }
-                Link {
-                    class: "status-link ipfs-status {ipfs_status_class}",
-                    to: Route::IpfsStatus {},
-                    "{ipfs_status_label}"
-                }
             }
         }
 
@@ -108,6 +89,8 @@ fn AccountSidebar() -> Element {
     let chain_conn = chain_connection();
     let indexer_connection = use_context::<Signal<IndexerConnection>>();
     let indexer_conn = indexer_connection();
+    let ipfs_connection = use_context::<Signal<IpfsConnection>>();
+    let ipfs_conn = ipfs_connection();
 
     let chain_dot_class = match chain_conn.status {
         ConnectionStatus::Connected => "sidebar-status-dot connected",
@@ -135,6 +118,12 @@ fn AccountSidebar() -> Element {
         },
         ConnectionStatus::Connecting => "Connecting…".to_string(),
         ConnectionStatus::Reconnecting => "Reconnecting…".to_string(),
+    };
+
+    let ipfs_dot_class = match ipfs_conn.status {
+        ConnectionStatus::Connected => "sidebar-status-dot connected",
+        ConnectionStatus::Connecting => "sidebar-status-dot connecting",
+        ConnectionStatus::Reconnecting => "sidebar-status-dot reconnecting",
     };
 
     // Which account's unlock modal is open (None = closed)
@@ -212,6 +201,13 @@ fn AccountSidebar() -> Element {
                     span { class: "{indexer_dot_class}" }
                     span { class: "sidebar-nav-label", "Indexer" }
                     span { class: "sidebar-nav-meta", "{indexer_block_label}" }
+                }
+                Link {
+                    class: "sidebar-nav-link",
+                    to: Route::IpfsStatus {},
+                    span { class: "{ipfs_dot_class}" }
+                    span { class: "sidebar-nav-label", "IPFS" }
+                    span { class: "sidebar-nav-meta", "" }
                 }
             }
         }

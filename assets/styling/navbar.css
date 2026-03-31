@@ -55,8 +55,7 @@
   color: inherit;
 }
 
-.indexer-status,
-.ipfs-status {
+.indexer-status {
   padding: 8px 12px;
   border-radius: 999px;
   font-size: 0.95rem;
@@ -96,17 +95,14 @@
   border-color: rgba(192, 105, 48, 0.26);
 }
 
-.indexer-status.connected,
-.ipfs-status.connected {
+.indexer-status.connected {
   color: #dbffe4;
   background: rgba(78, 183, 104, 0.12);
   border-color: rgba(78, 183, 104, 0.22);
 }
 
 .indexer-status.connecting,
-.indexer-status.reconnecting,
-.ipfs-status.connecting,
-.ipfs-status.reconnecting {
+.indexer-status.reconnecting {
   color: #fff3d4;
   background: rgba(212, 154, 42, 0.12);
   border-color: rgba(212, 154, 42, 0.22);
@@ -128,7 +124,6 @@
   }
 
   .indexer-status,
-  .ipfs-status,
   .account-status {
     white-space: normal;
     max-width: none;
