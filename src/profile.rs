@@ -1,4 +1,4 @@
-use crate::{ACUITY_NODE_URL, INDEXER_URL, IPFS_API_URL};
+use crate::{acuity_runtime::api, ACUITY_NODE_URL, INDEXER_URL, IPFS_API_URL};
 use base64::Engine;
 use futures::{SinkExt, StreamExt};
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
@@ -7,7 +7,7 @@ use prost::Message;
 use rand::RngCore;
 use reqwest::{multipart, Client};
 use serde::{Deserialize, Serialize};
-use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256, hashing::twox_128};
+use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
 use subxt::{dynamic::Value, OnlineClient, PolkadotConfig};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
@@ -147,6 +147,7 @@ struct IndexerEnvelope {
 #[serde(rename_all = "camelCase")]
 struct IndexerEventsResponse {
     events: Vec<IndexerEventRef>,
+    #[serde(default)]
     block_events: Vec<IndexerBlockEvents>,
 }
 
@@ -317,40 +318,94 @@ pub async fn save_profile(
         rand::thread_rng().fill_bytes(&mut nonce);
         let item_id = derive_item_id(account_id, nonce);
 
-        let publish_item_tx = subxt::dynamic::tx(
-            "Content",
-            "publish_item",
-            vec![
-                Value::from_bytes(nonce),
-                Value::unnamed_composite(Vec::<Value>::new()),
-                Value::u128(PROFILE_ITEM_FLAGS.into()),
-                Value::unnamed_composite(Vec::<Value>::new()),
-                Value::unnamed_composite(Vec::<Value>::new()),
-                Value::from_bytes(revision_ipfs_hash_bytes),
-            ],
+        let publish_item_call = api::Call::Content(
+            api::runtime_types::pallet_content::pallet::Call::publish_item {
+                nonce: api::runtime_types::pallet_content::Nonce(nonce),
+                parents: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                flags: PROFILE_ITEM_FLAGS,
+                links: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                mentions: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                ipfs_hash: api::runtime_types::pallet_content::pallet::IpfsHash(
+                    revision_ipfs_hash_bytes,
+                ),
+            },
         );
 
-        tx_client
-            .sign_and_submit_then_watch_default(&publish_item_tx, &signer)
-            .await
-            .map_err(|error| format!("Failed to create profile item: {error}"))?
-            .wait_for_finalized_success()
-            .await
-            .map_err(|error| format!("Profile creation failed: {error}"))?;
-
-        let set_profile_tx = subxt::dynamic::tx(
-            "AccountProfile",
-            "set_profile",
-            vec![Value::from_bytes(item_id)],
+        let set_profile_call = api::Call::AccountProfile(
+            api::runtime_types::pallet_account_profile::pallet::Call::set_profile {
+                item_id: api::runtime_types::pallet_content::pallet::ItemId(item_id),
+            },
         );
 
-        tx_client
-            .sign_and_submit_then_watch_default(&set_profile_tx, &signer)
+        let first_profile_batch_tx = api::tx()
+            .utility()
+            .batch_all(vec![publish_item_call, set_profile_call]);
+
+        let batch_events = tx_client
+            .sign_and_submit_then_watch_default(&first_profile_batch_tx, &signer)
             .await
-            .map_err(|error| format!("Failed to point account profile to new item: {error}"))?
+            .map_err(|error| format!("Failed to submit first profile batch: {error}"))?
             .wait_for_finalized_success()
             .await
-            .map_err(|error| format!("Setting the new profile pointer failed: {error}"))?;
+            .map_err(|error| format!("First profile creation failed: {error}"))?;
+
+        let mut saw_batch_completed = false;
+        let mut saw_profile_set = false;
+        for event in batch_events.iter() {
+            let event = event
+                .map_err(|error| format!("Failed to decode first profile batch event: {error}"))?;
+
+            if event.pallet_name() == "Utility" {
+                match event.event_name() {
+                    "BatchCompleted" => saw_batch_completed = true,
+                    "BatchInterrupted" => {
+                        return Err(
+                            "First profile batch was interrupted before all calls completed."
+                                .to_string(),
+                        );
+                    }
+                    _ => {}
+                }
+            }
+
+            if event.pallet_name() == "AccountProfile" && event.event_name() == "ProfileSet" {
+                saw_profile_set = true;
+            }
+        }
+
+        if !saw_batch_completed {
+            return Err(
+                "First profile batch finalized without a Utility::BatchCompleted event."
+                    .to_string(),
+            );
+        }
+
+        let published_item_id = batch_events
+            .find_first::<api::content::events::PublishItem>()
+            .transpose()
+            .map_err(|error| format!("Failed to decode Content::PublishItem event: {error}"))?
+            .ok_or_else(|| {
+                "First profile batch completed without emitting Content::PublishItem.".to_string()
+            })?
+            .item_id
+            .0;
+
+        if published_item_id != item_id {
+            return Err(
+                format!(
+                    "First profile batch created item {} but the dapp expected {}.",
+                    bytes32_to_hex(&published_item_id),
+                    bytes32_to_hex(&item_id),
+                ),
+            );
+        }
+
+        if !saw_profile_set {
+            return Err(
+                "First profile batch completed without emitting AccountProfile::ProfileSet."
+                    .to_string(),
+            );
+        }
 
         item_id
     };
@@ -460,26 +515,23 @@ async fn fetch_profile_item_id(account_id: AccountId32) -> Result<Option<[u8; 32
         .at_current_block()
         .await
         .map_err(|error| format!("Failed to access the latest block for storage: {error}"))?;
-    let storage = at_block.storage();
+    let storage_address = api::storage().account_profile().account_profile();
+    let storage_account_id = subxt::utils::AccountId32(account_id.into());
+    let maybe_item_id = at_block
+        .storage()
+        .try_fetch(&storage_address, (storage_account_id,))
+        .await
+        .map_err(|error| format!("Failed to fetch account profile pointer: {error}"))?;
 
-    let storage_key = account_profile_storage_key(&account_id);
-    let bytes = match storage.fetch_raw(storage_key).await {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            let message = error.to_string();
-            if message.contains("NoValueFound") {
-                return Ok(None);
-            }
-            return Err(format!(
-                "Failed to fetch account profile pointer: {message}"
-            ));
-        }
+    let Some(item_id) = maybe_item_id else {
+        return Ok(None);
     };
 
-    let item_id: [u8; 32] = bytes
-        .try_into()
-        .map_err(|_| "Profile item id in storage was not 32 bytes long.".to_string())?;
-    Ok(Some(item_id))
+    let item_id = item_id
+        .decode()
+        .map_err(|error| format!("Failed to decode account profile pointer: {error}"))?;
+
+    Ok(Some(item_id.0))
 }
 
 async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, String> {
@@ -763,30 +815,13 @@ fn encode_as_jpeg(image: &image::DynamicImage) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn account_profile_storage_key(account_id: &AccountId32) -> Vec<u8> {
-    let encoded_key = account_id.encode();
-    let mut storage_key = Vec::with_capacity(16 + 16 + 16 + encoded_key.len());
-    storage_key.extend_from_slice(&twox_128(b"AccountProfile"));
-    storage_key.extend_from_slice(&twox_128(b"AccountProfile"));
-    storage_key.extend_from_slice(&blake2_128_like(&encoded_key));
-    storage_key.extend_from_slice(&encoded_key);
-    storage_key
-}
-
-fn blake2_128_like(bytes: &[u8]) -> [u8; 16] {
-    let digest = blake2_256(bytes);
-    let mut out = [0_u8; 16];
-    out.copy_from_slice(&digest[..16]);
-    out
-}
-
 fn derive_item_id(account_id: AccountId32, nonce: [u8; 32]) -> [u8; 32] {
-    let payload = (
+    let payload = [
         account_id.encode(),
-        nonce.to_vec(),
+        nonce.encode(),
         parity_scale_codec::Encode::encode(&ITEM_ID_NAMESPACE),
-    )
-        .encode();
+    ]
+    .concat();
     blake2_256(&payload)
 }
 
