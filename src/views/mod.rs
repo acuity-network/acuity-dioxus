@@ -14,4 +14,4 @@ mod navbar;
 pub use navbar::Navbar;
 
 mod profile;
-pub use profile::Profile;
+pub use profile::{ProfileEdit, ProfileView};

@@ -103,7 +103,7 @@ pub fn Navbar() -> Element {
                     "Dashboard"
                 }
                 Link {
-                    to: Route::Profile {},
+                    to: Route::ProfileView {},
                     "Profile"
                 }
             }
