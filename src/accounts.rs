@@ -316,44 +316,6 @@ pub fn lock_account(store: &mut AccountStore, account_id: &str) {
     }
 }
 
-pub fn lock_active_account(store: &mut AccountStore) {
-    let Some(id) = store.active_account_id.clone() else {
-        store.set_error("Select an account first.");
-        return;
-    };
-    lock_account(store, &id);
-}
-
-pub fn delete_active_account(store: &mut AccountStore) {
-    let Some(active_id) = store.active_account_id.clone() else {
-        store.set_error("Select an account first.");
-        return;
-    };
-
-    let Some(account_index) = store
-        .accounts
-        .iter()
-        .position(|account| account.id == active_id)
-    else {
-        store.set_error("That account is no longer available.");
-        return;
-    };
-
-    let account = store.accounts[account_index].clone();
-    if let Err(error) = fs::remove_file(&account.path) {
-        store.set_error(format!("Failed to delete account file: {error}"));
-        return;
-    }
-
-    store.accounts.remove(account_index);
-    store.unlocked_signers.remove(&active_id);
-    store.active_account_id = store
-        .accounts
-        .first()
-        .map(|next_account| next_account.id.clone());
-    store.set_notice(format!("Deleted {}.", account.name));
-}
-
 /// Delete any account by id (not just the active one).
 pub fn delete_account(store: &mut AccountStore, account_id: &str) {
     let Some(account_index) = store

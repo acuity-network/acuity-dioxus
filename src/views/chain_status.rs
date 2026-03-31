@@ -61,6 +61,16 @@ pub fn ChainStatus() -> Element {
         .transaction_version
         .map(|value| value.to_string())
         .unwrap_or_else(|| "Unknown".to_string());
+    let ss58_prefix = chain_connection
+        .details
+        .ss58_prefix
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+    let existential_deposit = chain_connection
+        .details
+        .existential_deposit
+        .clone()
+        .unwrap_or_else(|| "Unknown".to_string());
 
     let finality_gap = match (
         chain_connection
@@ -161,9 +171,19 @@ pub fn ChainStatus() -> Element {
                             tone: status_badge_class.to_string(),
                         }
                         InfoCard {
+                            title: "SS58 prefix".to_string(),
+                            value: ss58_prefix,
+                            tone: "neutral".to_string(),
+                        }
+                        InfoCard {
                             title: "Transaction version".to_string(),
                             value: transaction_version,
                             tone: status_badge_class.to_string(),
+                        }
+                        InfoCard {
+                            title: "Existential deposit".to_string(),
+                            value: existential_deposit,
+                            tone: "neutral".to_string(),
                         }
                     }
                 }

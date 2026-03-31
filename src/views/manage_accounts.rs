@@ -2,7 +2,7 @@ use crate::{
     acuity_runtime::api,
     accounts::{create_account, delete_account, AccountStore},
     runtime_client::{connect as connect_acuity_client, AcuityClient},
-    ChainConnection, Route,
+    Route,
 };
 use dioxus::prelude::*;
 use fast_qr::{
@@ -304,6 +304,7 @@ async fn maintain_balance_subscription(
                     .decode_fields_unchecked_as::<api::system::events::NewAccount>()
                     .map_err(|error| format!("Failed to decode System::NewAccount event: {error}"))?;
                 track_account_id(&decoded.account, &tracked_accounts, &mut changed_addresses);
+                continue;
             }
         }
 
@@ -381,18 +382,9 @@ pub fn ManageAccounts() -> Element {
         });
     });
 
-    // Derive token format from chain properties; fall back to generic defaults.
-    let chain_connection = use_context::<Signal<ChainConnection>>();
-    let fmt = {
-        let details = &chain_connection().details;
-        TokenFormat {
-            symbol: details
-                .token_symbol
-                .clone()
-                .unwrap_or_else(|| "UNIT".to_string()),
-            decimals: details.token_decimals.unwrap_or(12),
-        }
-    };
+    // The generated runtime metadata does not expose a token symbol/decimals pair,
+    // so balances keep a neutral display format until the runtime provides one.
+    let fmt = TokenFormat::default();
 
     rsx! {
         document::Link { rel: "stylesheet", href: MANAGE_ACCOUNTS_CSS }

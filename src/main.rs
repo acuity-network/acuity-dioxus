@@ -5,8 +5,9 @@ use serde::Deserialize;
 use std::time::Duration;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
+use acuity_runtime::api;
 use accounts::load_account_store;
-use runtime_client::{connect as connect_acuity_client, connect_legacy_rpc};
+use runtime_client::connect as connect_acuity_client;
 use views::{
     ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ManageAccounts, Navbar,
     ProfileEdit, ProfileView,
@@ -33,10 +34,10 @@ pub(crate) struct ChainDetails {
     pub(crate) finalized_block_number: Option<String>,
     pub(crate) finalized_block_hash: Option<String>,
     pub(crate) genesis_hash: Option<String>,
+    pub(crate) ss58_prefix: Option<u16>,
+    pub(crate) existential_deposit: Option<String>,
     pub(crate) spec_version: Option<u32>,
     pub(crate) transaction_version: Option<u32>,
-    pub(crate) token_symbol: Option<String>,
-    pub(crate) token_decimals: Option<u8>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -315,32 +316,18 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
         .await
         .map_err(|error| format!("Failed to inspect the latest finalized block: {error}"))?;
 
-    // Fetch token symbol and decimals from chain system properties.
-    let (token_symbol, token_decimals) = {
-        let legacy = connect_legacy_rpc().await?;
-        match legacy.system_properties().await {
-            Ok(props) => {
-                let symbol = props
-                    .get("tokenSymbol")
-                    .and_then(|v: &serde_json::Value| {
-                        // May be a string or a single-element array.
-                        v.as_str()
-                            .map(|s| s.to_string())
-                            .or_else(|| v.as_array()?.first()?.as_str().map(|s| s.to_string()))
-                    });
-                let decimals = props
-                    .get("tokenDecimals")
-                    .and_then(|v: &serde_json::Value| {
-                        // May be a number or a single-element array.
-                        v.as_u64()
-                            .or_else(|| v.as_array()?.first()?.as_u64())
-                            .map(|n| n as u8)
-                    });
-                (symbol, decimals)
-            }
-            Err(_) => (None, None),
-        }
-    };
+    let version = finalized_block
+        .constants()
+        .entry(&api::constants().system().version())
+        .map_err(|error| format!("Failed to read System::Version constant: {error}"))?;
+    let ss58_prefix = finalized_block
+        .constants()
+        .entry(&api::constants().system().ss58_prefix())
+        .map_err(|error| format!("Failed to read System::SS58Prefix constant: {error}"))?;
+    let existential_deposit = finalized_block
+        .constants()
+        .entry(&api::constants().balances().existential_deposit())
+        .map_err(|error| format!("Failed to read Balances::ExistentialDeposit constant: {error}"))?;
 
     let mut details = chain_connection().details.clone();
     let finalized_block_number = finalized_block.block_number().to_string();
@@ -351,10 +338,10 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
     details.best_block_number = Some(finalized_block_number);
     details.best_block_hash = Some(finalized_block_hash);
     details.genesis_hash = Some(client.genesis_hash().to_string());
-    details.spec_version = Some(finalized_block.spec_version());
-    details.transaction_version = Some(finalized_block.transaction_version());
-    details.token_symbol = token_symbol;
-    details.token_decimals = token_decimals;
+    details.ss58_prefix = Some(ss58_prefix);
+    details.existential_deposit = Some(existential_deposit.to_string());
+    details.spec_version = Some(version.spec_version);
+    details.transaction_version = Some(version.transaction_version);
     chain_connection.set(ChainConnection::connected(details));
 
     let mut best_blocks = client
@@ -394,8 +381,12 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
                 let mut details = chain_connection().details.clone();
                 details.finalized_block_number = Some(block.number().to_string());
                 details.finalized_block_hash = Some(block.hash().to_string());
-                details.spec_version = Some(finalized_at.spec_version());
-                details.transaction_version = Some(finalized_at.transaction_version());
+                let version = finalized_at
+                    .constants()
+                    .entry(&api::constants().system().version())
+                    .map_err(|error| format!("Failed to read System::Version constant: {error}"))?;
+                details.spec_version = Some(version.spec_version);
+                details.transaction_version = Some(version.transaction_version);
                 chain_connection.set(ChainConnection::connected(details));
             }
         }

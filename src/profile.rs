@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
+use subxt::events::DecodeAsEvent;
 
 use crate::accounts::AccountStore;
 
@@ -348,20 +349,19 @@ pub async fn save_profile(
             let event = event
                 .map_err(|error| format!("Failed to decode first profile batch event: {error}"))?;
 
-            if event.pallet_name() == "Utility" {
-                match event.event_name() {
-                    "BatchCompleted" => saw_batch_completed = true,
-                    "BatchInterrupted" => {
-                        return Err(
-                            "First profile batch was interrupted before all calls completed."
-                                .to_string(),
-                        );
-                    }
-                    _ => {}
-                }
+            if api::utility::events::BatchCompleted::is_event(event.pallet_name(), event.event_name()) {
+                saw_batch_completed = true;
+                continue;
             }
 
-            if event.pallet_name() == "AccountProfile" && event.event_name() == "ProfileSet" {
+            if api::utility::events::BatchInterrupted::is_event(event.pallet_name(), event.event_name()) {
+                return Err(
+                    "First profile batch was interrupted before all calls completed."
+                        .to_string(),
+                );
+            }
+
+            if api::account_profile::events::ProfileSet::is_event(event.pallet_name(), event.event_name()) {
                 saw_profile_set = true;
             }
         }
