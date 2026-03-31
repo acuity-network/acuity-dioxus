@@ -14,34 +14,12 @@ const SIDEBAR_CSS: Asset = asset!("/assets/styling/sidebar.css");
 
 #[component]
 pub fn Navbar() -> Element {
-    let chain_connection = use_context::<Signal<ChainConnection>>();
-    let chain_connection = chain_connection();
     let indexer_connection = use_context::<Signal<IndexerConnection>>();
     let indexer_connection = indexer_connection();
     let ipfs_connection = use_context::<Signal<IpfsConnection>>();
     let ipfs_connection = ipfs_connection();
     let account_store = use_context::<Signal<AccountStore>>();
     let account_store_snap = account_store();
-
-    let status_class = match chain_connection.status {
-        ConnectionStatus::Connected => "connected",
-        ConnectionStatus::Connecting => "connecting",
-        ConnectionStatus::Reconnecting => "reconnecting",
-    };
-
-    let status_label = match chain_connection.status {
-        ConnectionStatus::Connected => {
-            match chain_connection.details.best_block_number.as_deref() {
-                Some(block_number) => format!("Block {block_number}"),
-                None => "Connected".to_string(),
-            }
-        }
-        ConnectionStatus::Connecting => "Connecting to Acuity".to_string(),
-        ConnectionStatus::Reconnecting => match chain_connection.last_error.as_deref() {
-            Some(error) => format!("Reconnecting: {error}"),
-            None => "Reconnecting to Acuity".to_string(),
-        },
-    };
 
     let ipfs_status_class = match ipfs_connection.status {
         ConnectionStatus::Connected => "connected",
@@ -118,11 +96,6 @@ pub fn Navbar() -> Element {
                     "{account_label}"
                 }
                 Link {
-                    class: "status-link chain-status {status_class}",
-                    to: Route::ChainStatus {},
-                    "{status_label}"
-                }
-                Link {
                     class: "status-link indexer-status {indexer_status_class}",
                     to: Route::IndexerStatus {},
                     "{indexer_status_label}"
@@ -153,6 +126,22 @@ pub fn Navbar() -> Element {
 fn AccountSidebar() -> Element {
     let mut account_store = use_context::<Signal<AccountStore>>();
     let snap = account_store();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
+    let chain_conn = chain_connection();
+
+    let chain_dot_class = match chain_conn.status {
+        ConnectionStatus::Connected => "sidebar-status-dot connected",
+        ConnectionStatus::Connecting => "sidebar-status-dot connecting",
+        ConnectionStatus::Reconnecting => "sidebar-status-dot reconnecting",
+    };
+    let chain_block_label = match chain_conn.status {
+        ConnectionStatus::Connected => match chain_conn.details.best_block_number.as_deref() {
+            Some(n) => format!("#{n}"),
+            None => "Connected".to_string(),
+        },
+        ConnectionStatus::Connecting => "Connecting…".to_string(),
+        ConnectionStatus::Reconnecting => "Reconnecting…".to_string(),
+    };
 
     // Which account's unlock modal is open (None = closed)
     let mut unlock_target_id: Signal<Option<String>> = use_signal(|| None);
@@ -209,6 +198,19 @@ fn AccountSidebar() -> Element {
                             }
                         }
                     }
+                }
+            }
+
+            // Services section
+            div {
+                class: "sidebar-services-section",
+                p { class: "sidebar-heading", "Services" }
+                Link {
+                    class: "sidebar-nav-link",
+                    to: Route::ChainStatus {},
+                    span { class: "{chain_dot_class}" }
+                    span { class: "sidebar-nav-label", "Chain" }
+                    span { class: "sidebar-nav-meta", "{chain_block_label}" }
                 }
             }
         }

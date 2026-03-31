@@ -1,190 +1,318 @@
+/* ── Shell ────────────────────────────────────────────────────────────────── */
+
 .chain-shell {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
+
+/* ── Shared panel surface ─────────────────────────────────────────────────── */
 
 .panel-surface {
   border: 1px solid rgba(145, 164, 210, 0.16);
-  border-radius: 24px;
+  border-radius: 20px;
   background: linear-gradient(180deg, rgba(20, 25, 34, 0.9) 0%, rgba(14, 18, 25, 0.96) 100%);
-  box-shadow: 0 20px 50px rgba(4, 10, 22, 0.34);
+  box-shadow: 0 12px 32px rgba(4, 10, 22, 0.28);
 }
 
-.chain-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
-  gap: 18px;
-  padding: 28px;
-}
+/* ── Shared typography ────────────────────────────────────────────────────── */
 
-.hero-copy h1,
-.panel-heading h2 {
-  margin: 0;
-  color: #f7fbff;
-}
-
-.eyebrow,
 .label {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #8fb7ff;
+  color: rgba(143, 183, 255, 0.7);
 }
 
-.hero-text,
-.status-copy,
-.banner-copy,
-.info-value,
-.field-value {
-  margin: 0;
-  color: rgba(235, 242, 255, 0.82);
-  line-height: 1.6;
-}
+/* ── Status bar ───────────────────────────────────────────────────────────── */
 
-.hero-copy,
-.hero-status-card,
-.overview-panel,
-.identity-panel {
+.status-bar {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
 }
 
-.hero-status-card {
-  padding: 20px;
-  border-radius: 20px;
-  background: radial-gradient(circle at top right, rgba(91, 132, 226, 0.18), transparent 45%), rgba(9, 14, 23, 0.88);
-  border: 1px solid rgba(144, 166, 215, 0.18);
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
-  padding: 10px 16px;
+  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.status-badge.connected,
-.info-card.connected {
+.status-badge.connected {
   color: #dbffe4;
-  background: rgba(78, 183, 104, 0.12);
-  border-color: rgba(78, 183, 104, 0.22);
+  background: rgba(78, 183, 104, 0.14);
+  border-color: rgba(78, 183, 104, 0.28);
 }
 
 .status-badge.connecting,
-.status-badge.reconnecting,
-.info-card.connecting,
-.info-card.reconnecting {
+.status-badge.reconnecting {
   color: #fff3d4;
-  background: rgba(212, 154, 42, 0.12);
-  border-color: rgba(212, 154, 42, 0.22);
+  background: rgba(212, 154, 42, 0.14);
+  border-color: rgba(212, 154, 42, 0.28);
 }
 
-.chain-banner {
-  padding: 18px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(212, 154, 42, 0.24);
-  background: rgba(212, 154, 42, 0.1);
+.status-bar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.banner-title-row,
-.panel-heading {
+.status-bar-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f0f4ff;
+}
+
+.status-bar-url {
+  font-size: 0.8rem;
+  color: rgba(180, 199, 241, 0.55);
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+}
+
+.status-bar-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
+}
+
+.status-bar-meta-label {
+  font-size: 0.78rem;
+  color: rgba(143, 183, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-bar-meta-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(210, 224, 255, 0.75);
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────── */
+
+.chain-banner {
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 154, 42, 0.28);
+  background: rgba(212, 154, 42, 0.08);
+}
+
+.banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
 .banner-title {
-  color: #fff7e4;
+  font-size: 0.9rem;
   font-weight: 600;
+  color: #fff7e4;
 }
 
 .banner-pill {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: #fff3d4;
-  background: rgba(120, 76, 15, 0.44);
+  background: rgba(120, 76, 15, 0.5);
 }
+
+.banner-copy {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(255, 243, 212, 0.75);
+  line-height: 1.5;
+}
+
+/* ── Primary block metrics row ────────────────────────────────────────────── */
+
+.blocks-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.block-metric {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.primary-metric {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.primary-metric.connected {
+  color: #c8ffd4;
+}
+
+.primary-metric.connecting,
+.primary-metric.reconnecting {
+  color: #fff3c8;
+}
+
+/* ── Chain identity + runtime grid ───────────────────────────────────────── */
 
 .chain-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
-.overview-panel,
-.identity-panel {
-  padding: 24px;
+.identity-panel,
+.runtime-panel {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.facts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.panel-heading {
+  display: flex;
+  align-items: center;
 }
 
-.info-card {
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(145, 164, 210, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+.panel-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: #f0f4ff;
+  letter-spacing: -0.01em;
+}
+
+/* ── Hash fields ──────────────────────────────────────────────────────────── */
+
+.field-stack {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.info-card.neutral {
-  color: #e8f1ff;
-}
-
-.field-stack {
+.metadata-field {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(145, 164, 210, 0.12);
+  background: rgba(255, 255, 255, 0.025);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
 }
 
-.metadata-field {
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(145, 164, 210, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-value {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(210, 224, 255, 0.8);
+  line-height: 1.4;
 }
 
 .mono {
   font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
-  word-break: break-word;
+  word-break: break-all;
 }
 
+.copy-btn {
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(145, 164, 210, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(180, 199, 241, 0.7);
+  font-size: 0.72rem;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: rgba(85, 168, 224, 0.14);
+  border-color: rgba(85, 168, 224, 0.38);
+  color: #a8d8f8;
+}
+
+/* ── Runtime facts grid ───────────────────────────────────────────────────── */
+
+.facts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.info-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(145, 164, 210, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #e8f1ff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
 @media (max-width: 900px) {
-  .chain-hero,
-  .chain-grid,
-  .facts-grid {
+  .chain-grid {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 640px) {
-  .chain-hero,
-  .overview-panel,
-  .identity-panel {
-    padding: 20px;
+@media (max-width: 720px) {
+  .blocks-row {
+    grid-template-columns: 1fr;
   }
 
-  .banner-title-row,
-  .panel-heading {
+  .primary-metric {
+    font-size: 1.9rem;
+  }
+
+  .status-bar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+  }
+
+  .facts-grid {
+    grid-template-columns: 1fr;
   }
 }

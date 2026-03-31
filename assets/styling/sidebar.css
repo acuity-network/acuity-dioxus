@@ -268,6 +268,73 @@
   border: 1px solid rgba(145, 164, 210, 0.18);
 }
 
+/* ── Services section ────────────────────────────────────────────────────── */
+
+.sidebar-services-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(145, 164, 210, 0.12);
+}
+
+.sidebar-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: rgba(218, 227, 246, 0.8);
+  font-size: 0.9rem;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.sidebar-nav-link:hover {
+  background: rgba(30, 40, 58, 0.5);
+  color: #f0f4ff;
+}
+
+.sidebar-nav-link.active-link {
+  border-color: rgba(101, 179, 235, 0.32);
+  background: linear-gradient(135deg, rgba(19, 32, 49, 0.85), rgba(18, 44, 53, 0.85));
+  color: #f0f4ff;
+}
+
+.sidebar-nav-label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.sidebar-nav-meta {
+  font-size: 0.78rem;
+  color: rgba(180, 199, 241, 0.55);
+  font-variant-numeric: tabular-nums;
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+}
+
+/* ── Status dot ──────────────────────────────────────────────────────────── */
+
+.sidebar-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-status-dot.connected {
+  background: #4eb768;
+  box-shadow: 0 0 6px rgba(78, 183, 104, 0.6);
+}
+
+.sidebar-status-dot.connecting,
+.sidebar-status-dot.reconnecting {
+  background: #d49a2a;
+  box-shadow: 0 0 6px rgba(212, 154, 42, 0.6);
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
@@ -291,5 +358,23 @@
 
   .sidebar-account {
     flex: 1 1 160px;
+  }
+
+  .sidebar-services-section {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    padding-top: 8px;
+    gap: 4px;
+  }
+
+  .sidebar-services-section .sidebar-heading {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .sidebar-nav-link {
+    flex: 1 1 auto;
   }
 }

@@ -55,7 +55,6 @@
   color: inherit;
 }
 
-.chain-status,
 .indexer-status,
 .ipfs-status {
   padding: 8px 12px;
@@ -97,7 +96,6 @@
   border-color: rgba(192, 105, 48, 0.26);
 }
 
-.chain-status.connected,
 .indexer-status.connected,
 .ipfs-status.connected {
   color: #dbffe4;
@@ -105,8 +103,6 @@
   border-color: rgba(78, 183, 104, 0.22);
 }
 
-.chain-status.connecting,
-.chain-status.reconnecting,
 .indexer-status.connecting,
 .indexer-status.reconnecting,
 .ipfs-status.connecting,
@@ -131,7 +127,6 @@
     justify-content: flex-start;
   }
 
-  .chain-status,
   .indexer-status,
   .ipfs-status,
   .account-status {
