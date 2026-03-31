@@ -225,6 +225,35 @@ pub fn create_account(store: &mut AccountStore, name: &str, password: &str) {
     store.set_notice(format!("Created {}.", account.name));
 }
 
+/// Run the CPU-heavy scrypt + decrypt on a background thread.
+/// Returns `Ok((signer, account_name))` on success or `Err(message)` on failure.
+/// This function is `Send + 'static` so it can be passed to `spawn_blocking`.
+pub fn unlock_account_blocking(
+    account_path: PathBuf,
+    account_name: String,
+    password: String,
+) -> Result<(SignerKeypair, String), String> {
+    let account_json = fs::read_to_string(&account_path)
+        .map_err(|e| format!("Failed to read account file: {e}"))?;
+    let signer = polkadot_js_compat::decrypt_json(&account_json, &password)
+        .map_err(|e| format!("Failed to unlock account: {e}"))?;
+    Ok((signer, account_name))
+}
+
+pub fn apply_unlock_result(
+    store: &mut AccountStore,
+    result: Result<(SignerKeypair, String), String>,
+) {
+    match result {
+        Ok((signer, name)) => {
+            store.active_signer = Some(signer);
+            store.set_notice(format!("Unlocked {}.", name));
+        }
+        Err(message) => store.set_error(message),
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn unlock_active_account(store: &mut AccountStore, password: &str) {
     if password.is_empty() {
         store.set_error("Enter the password for the active account.");
@@ -236,24 +265,8 @@ pub fn unlock_active_account(store: &mut AccountStore, password: &str) {
         return;
     };
 
-    let account_json = match fs::read_to_string(&account.path) {
-        Ok(account_json) => account_json,
-        Err(error) => {
-            store.set_error(format!("Failed to read account file: {error}"));
-            return;
-        }
-    };
-
-    let signer = match polkadot_js_compat::decrypt_json(&account_json, password) {
-        Ok(signer) => signer,
-        Err(error) => {
-            store.set_error(format!("Failed to unlock account: {error}"));
-            return;
-        }
-    };
-
-    store.active_signer = Some(signer);
-    store.set_notice(format!("Unlocked {}.", account.name));
+    let result = unlock_account_blocking(account.path, account.name, password.to_string());
+    apply_unlock_result(store, result);
 }
 
 pub fn lock_active_account(store: &mut AccountStore) {

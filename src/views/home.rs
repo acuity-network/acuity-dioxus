@@ -1,6 +1,6 @@
 use crate::accounts::{
-    create_account, delete_active_account, lock_active_account, select_active_account,
-    unlock_active_account, AccountStore,
+    apply_unlock_result, create_account, delete_active_account, lock_active_account,
+    select_active_account, unlock_account_blocking, AccountStore,
 };
 use dioxus::prelude::*;
 
@@ -11,6 +11,7 @@ pub fn Home() -> Element {
     let mut create_name = use_signal(String::new);
     let mut create_password = use_signal(String::new);
     let mut unlock_password = use_signal(String::new);
+    let mut unlocking = use_signal(|| false);
     let mut account_store = use_context::<Signal<AccountStore>>();
     let account_snapshot = account_store();
 
@@ -148,15 +149,38 @@ pub fn Home() -> Element {
 
                             button {
                                 class: "primary-action",
+                                disabled: unlocking(),
                                 onclick: move |_| {
                                     let password = unlock_password();
-                                    account_store.with_mut(|store| unlock_active_account(store, &password));
-
-                                    if account_store().error_message.is_none() {
-                                        unlock_password.set(String::new());
+                                    if password.is_empty() {
+                                        account_store.with_mut(|store| {
+                                            store.error_message = Some("Enter the password for the active account.".to_string());
+                                            store.notice_message = None;
+                                        });
+                                        return;
                                     }
+                                    let Some(account) = account_store().active_account().cloned() else {
+                                        account_store.with_mut(|store| {
+                                            store.error_message = Some("Select an account first.".to_string());
+                                            store.notice_message = None;
+                                        });
+                                        return;
+                                    };
+                                    unlocking.set(true);
+                                    spawn(async move {
+                                        let result = tokio::task::spawn_blocking(move || {
+                                            unlock_account_blocking(account.path, account.name, password)
+                                        })
+                                        .await
+                                        .unwrap_or_else(|e| Err(format!("Unlock task panicked: {e}")));
+                                        account_store.with_mut(|store| apply_unlock_result(store, result));
+                                        if account_store().error_message.is_none() {
+                                            unlock_password.set(String::new());
+                                        }
+                                        unlocking.set(false);
+                                    });
                                 },
-                                "Unlock active account"
+                                if unlocking() { "Unlocking..." } else { "Unlock active account" }
                             }
                         }
 
