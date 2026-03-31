@@ -524,19 +524,21 @@ pub mod api {
                 #[doc = " Returns the concatenated SCALE encoded public keys."]
                 pub fn generate_session_keys(
                     &self,
+                    owner: generate_session_keys::Owner,
                     seed: generate_session_keys::Seed,
                 ) -> ::subxt::runtime_apis::StaticPayload<
-                    (generate_session_keys::Seed,),
+                    (generate_session_keys::Owner, generate_session_keys::Seed),
                     generate_session_keys::output::Output,
                 > {
                     ::subxt::runtime_apis::StaticPayload::new_static(
                         "SessionKeys",
                         "generate_session_keys",
-                        (seed,),
+                        (owner, seed),
                         [
-                            96u8, 171u8, 164u8, 166u8, 175u8, 102u8, 101u8, 47u8, 133u8, 95u8,
-                            102u8, 202u8, 83u8, 26u8, 238u8, 47u8, 126u8, 132u8, 22u8, 11u8, 33u8,
-                            190u8, 175u8, 94u8, 58u8, 245u8, 46u8, 80u8, 195u8, 184u8, 107u8, 65u8,
+                            94u8, 230u8, 217u8, 119u8, 217u8, 37u8, 67u8, 190u8, 118u8, 204u8,
+                            72u8, 95u8, 58u8, 138u8, 153u8, 164u8, 95u8, 31u8, 85u8, 83u8, 199u8,
+                            12u8, 119u8, 135u8, 248u8, 96u8, 85u8, 142u8, 84u8, 238u8, 111u8,
+                            254u8,
                         ],
                     )
                 }
@@ -566,11 +568,13 @@ pub mod api {
             pub mod generate_session_keys {
                 use super::root_mod;
                 use super::runtime_types;
+                pub type Owner = ::subxt::alloc::vec::Vec<::core::primitive::u8>;
                 pub type Seed =
                     ::core::option::Option<::subxt::alloc::vec::Vec<::core::primitive::u8>>;
                 pub mod output {
                     use super::runtime_types;
-                    pub type Output = ::subxt::alloc::vec::Vec<::core::primitive::u8>;
+                    pub type Output =
+                        runtime_types::sp_session::runtime_api::OpaqueGeneratedSessionKeys;
                 }
             }
             pub mod decode_session_keys {
@@ -1073,9 +1077,9 @@ pub mod api {
             .hash();
         runtime_metadata_hash
             == [
-                222u8, 39u8, 20u8, 232u8, 114u8, 3u8, 87u8, 11u8, 78u8, 75u8, 167u8, 160u8, 81u8,
-                3u8, 229u8, 115u8, 30u8, 212u8, 221u8, 35u8, 129u8, 30u8, 64u8, 113u8, 130u8,
-                208u8, 167u8, 32u8, 71u8, 151u8, 106u8, 20u8,
+                32u8, 96u8, 251u8, 139u8, 113u8, 40u8, 210u8, 205u8, 119u8, 72u8, 179u8, 144u8,
+                73u8, 75u8, 46u8, 53u8, 116u8, 61u8, 216u8, 10u8, 221u8, 108u8, 45u8, 68u8, 235u8,
+                252u8, 37u8, 57u8, 14u8, 33u8, 169u8, 90u8,
             ]
     }
     pub mod system {
@@ -1885,21 +1889,21 @@ pub mod api {
                         ],
                     )
                 }
-                #[doc = " Total length (in bytes) for all extrinsics put together, for the current block."]
-                pub fn all_extrinsics_len(
+                #[doc = " Total size (in bytes) of the current block."]
+                #[doc = ""]
+                #[doc = " Tracks the size of the header and all extrinsics."]
+                pub fn block_size(
                     &self,
-                ) -> ::subxt::storage::StaticAddress<
-                    (),
-                    all_extrinsics_len::Output,
-                    ::subxt::utils::Yes,
-                > {
+                ) -> ::subxt::storage::StaticAddress<(), block_size::Output, ::subxt::utils::Yes>
+                {
                     ::subxt::storage::StaticAddress::new_static(
                         "System",
-                        "AllExtrinsicsLen",
+                        "BlockSize",
                         [
-                            120u8, 200u8, 84u8, 67u8, 97u8, 25u8, 119u8, 71u8, 170u8, 217u8, 12u8,
-                            157u8, 63u8, 100u8, 245u8, 118u8, 99u8, 65u8, 148u8, 110u8, 252u8,
-                            86u8, 172u8, 45u8, 235u8, 90u8, 58u8, 123u8, 59u8, 191u8, 1u8, 215u8,
+                            189u8, 209u8, 204u8, 16u8, 123u8, 182u8, 74u8, 254u8, 0u8, 137u8,
+                            184u8, 170u8, 94u8, 208u8, 251u8, 174u8, 105u8, 91u8, 184u8, 127u8,
+                            194u8, 201u8, 191u8, 81u8, 121u8, 136u8, 121u8, 127u8, 4u8, 40u8,
+                            179u8, 159u8,
                         ],
                     )
                 }
@@ -2068,6 +2072,24 @@ pub mod api {
                         ],
                     )
                 }
+                #[doc = " Number of blocks till the pending code upgrade is applied."]
+                pub fn blocks_till_upgrade(
+                    &self,
+                ) -> ::subxt::storage::StaticAddress<
+                    (),
+                    blocks_till_upgrade::Output,
+                    ::subxt::utils::Yes,
+                > {
+                    ::subxt::storage::StaticAddress::new_static(
+                        "System",
+                        "BlocksTillUpgrade",
+                        [
+                            5u8, 76u8, 239u8, 121u8, 109u8, 31u8, 178u8, 175u8, 48u8, 175u8, 25u8,
+                            101u8, 201u8, 220u8, 19u8, 118u8, 173u8, 45u8, 211u8, 17u8, 50u8,
+                            134u8, 168u8, 8u8, 69u8, 29u8, 245u8, 207u8, 146u8, 204u8, 15u8, 145u8,
+                        ],
+                    )
+                }
                 #[doc = " True if we have upgraded so that `type RefCount` is `u32`. False (default) if not."]
                 pub fn upgraded_to_u32_ref_count(
                     &self,
@@ -2202,7 +2224,7 @@ pub mod api {
                     runtime_types::sp_weights::weight_v2::Weight,
                 >;
             }
-            pub mod all_extrinsics_len {
+            pub mod block_size {
                 use super::root_mod;
                 use super::runtime_types;
                 pub mod input {
@@ -2291,6 +2313,14 @@ pub mod api {
                 }
                 pub type Output = runtime_types::frame_system::LastRuntimeUpgradeInfo;
             }
+            pub mod blocks_till_upgrade {
+                use super::root_mod;
+                use super::runtime_types;
+                pub mod input {
+                    use super::runtime_types;
+                }
+                pub type Output = ::core::primitive::u8;
+            }
             pub mod upgraded_to_u32_ref_count {
                 use super::root_mod;
                 use super::runtime_types;
@@ -2362,9 +2392,10 @@ pub mod api {
                         "System",
                         "BlockLength",
                         [
-                            23u8, 242u8, 225u8, 39u8, 225u8, 67u8, 152u8, 41u8, 155u8, 104u8, 68u8,
-                            229u8, 185u8, 133u8, 10u8, 143u8, 184u8, 152u8, 234u8, 44u8, 140u8,
-                            96u8, 166u8, 235u8, 162u8, 160u8, 72u8, 7u8, 35u8, 194u8, 3u8, 37u8,
+                            25u8, 97u8, 176u8, 77u8, 2u8, 60u8, 44u8, 69u8, 161u8, 69u8, 251u8,
+                            229u8, 198u8, 186u8, 185u8, 237u8, 105u8, 56u8, 122u8, 35u8, 78u8,
+                            195u8, 98u8, 222u8, 215u8, 49u8, 249u8, 146u8, 231u8, 21u8, 224u8,
+                            134u8,
                         ],
                     )
                 }
@@ -2720,7 +2751,8 @@ pub mod api {
             pub struct ConstantsApi;
             impl ConstantsApi {
                 #[doc = " The slot duration Aura should run with, expressed in milliseconds."]
-                #[doc = " The effective value of this type should not change while the chain is running."]
+                #[doc = ""]
+                #[doc = " The effective value of this type can be changed with a runtime upgrade."]
                 #[doc = ""]
                 #[doc = " For backwards compatibility either use [`MinimumPeriodTimesTwo`] or a const."]
                 pub fn slot_duration(
@@ -7148,6 +7180,7 @@ pub mod api {
                     pub max: runtime_types::frame_support::dispatch::PerDispatchClass<
                         ::core::primitive::u32,
                     >,
+                    pub max_header_size: ::core::option::Option<::core::primitive::u32>,
                 }
                 #[derive(
                     :: subxt :: ext :: scale_decode :: DecodeAsType,
@@ -9782,6 +9815,23 @@ pub mod api {
                 LimitReached,
                 #[codec(index = 1)]
                 NoLayer,
+            }
+        }
+        pub mod sp_session {
+            use super::runtime_types;
+            pub mod runtime_api {
+                use super::runtime_types;
+                #[derive(
+                    :: subxt :: ext :: scale_decode :: DecodeAsType,
+                    :: subxt :: ext :: scale_encode :: EncodeAsType,
+                    Debug,
+                )]
+                #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+                #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+                pub struct OpaqueGeneratedSessionKeys {
+                    pub keys: ::subxt::alloc::vec::Vec<::core::primitive::u8>,
+                    pub proof: ::subxt::alloc::vec::Vec<::core::primitive::u8>,
+                }
             }
         }
         pub mod sp_version {
