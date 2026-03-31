@@ -3,12 +3,10 @@ use futures::{SinkExt, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
-use subxt::{
-    config::RpcConfigFor, rpcs::methods::legacy::LegacyRpcMethods, OnlineClient, PolkadotConfig,
-};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use accounts::load_account_store;
+use runtime_client::{connect as connect_acuity_client, connect_legacy_rpc};
 use views::{
     ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ManageAccounts, Navbar,
     ProfileEdit, ProfileView,
@@ -214,6 +212,7 @@ struct IndexerResponse {
 mod accounts;
 mod acuity_runtime;
 mod profile;
+mod runtime_client;
 mod views;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -309,9 +308,7 @@ async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
 }
 
 async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Result<(), String> {
-    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
-        .await
-        .map_err(|error| format!("Failed to connect to {ACUITY_NODE_URL}: {error}"))?;
+    let client = connect_acuity_client().await?;
 
     let finalized_block = client
         .at_current_block()
@@ -320,10 +317,7 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
 
     // Fetch token symbol and decimals from chain system properties.
     let (token_symbol, token_decimals) = {
-        let rpc_client = subxt::rpcs::RpcClient::from_insecure_url(ACUITY_NODE_URL)
-            .await
-            .map_err(|error| format!("Failed to connect RPC client: {error}"))?;
-        let legacy = LegacyRpcMethods::<RpcConfigFor<PolkadotConfig>>::new(rpc_client);
+        let legacy = connect_legacy_rpc().await?;
         match legacy.system_properties().await {
             Ok(props) => {
                 let symbol = props

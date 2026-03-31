@@ -1,4 +1,4 @@
-use crate::{acuity_runtime::api, ACUITY_NODE_URL, INDEXER_URL, IPFS_API_URL};
+use crate::{acuity_runtime::api, runtime_client::connect as connect_acuity_client, INDEXER_URL, IPFS_API_URL};
 use base64::Engine;
 use futures::{SinkExt, StreamExt};
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
@@ -9,7 +9,6 @@ use reqwest::{multipart, Client};
 use serde::{Deserialize, Serialize};
 use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
-use subxt::{dynamic::Value, OnlineClient, PolkadotConfig};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 
 use crate::accounts::AccountStore;
@@ -283,9 +282,7 @@ pub async fn save_profile(
     let revision_ipfs_hash = upload_ipfs_digest(&item_payload).await?;
     let revision_ipfs_hash_bytes = hex_to_bytes32(&revision_ipfs_hash)?;
 
-    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
-        .await
-        .map_err(|error| format!("Failed to connect to {ACUITY_NODE_URL}: {error}"))?;
+    let client = connect_acuity_client().await?;
     let at_block = client
         .at_current_block()
         .await
@@ -293,15 +290,11 @@ pub async fn save_profile(
     let mut tx_client = at_block.tx();
 
     let item_id = if let Some(existing_item_id) = request.existing_item_id {
-        let publish_revision_tx = subxt::dynamic::tx(
-            "Content",
-            "publish_revision",
-            vec![
-                Value::from_bytes(existing_item_id),
-                Value::unnamed_composite(Vec::<Value>::new()),
-                Value::unnamed_composite(Vec::<Value>::new()),
-                Value::from_bytes(revision_ipfs_hash_bytes),
-            ],
+        let publish_revision_tx = api::tx().content().publish_revision(
+            api::runtime_types::pallet_content::pallet::ItemId(existing_item_id),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(revision_ipfs_hash_bytes),
         );
 
         tx_client
@@ -508,9 +501,7 @@ where
 }
 
 async fn fetch_profile_item_id(account_id: AccountId32) -> Result<Option<[u8; 32]>, String> {
-    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
-        .await
-        .map_err(|error| format!("Failed to connect to {ACUITY_NODE_URL}: {error}"))?;
+    let client = connect_acuity_client().await?;
     let at_block = client
         .at_current_block()
         .await

@@ -1,6 +1,8 @@
 use crate::{
+    acuity_runtime::api,
     accounts::{create_account, delete_account, AccountStore},
-    ChainConnection, Route, ACUITY_NODE_URL,
+    runtime_client::{connect as connect_acuity_client, AcuityClient},
+    ChainConnection, Route,
 };
 use dioxus::prelude::*;
 use fast_qr::{
@@ -8,7 +10,8 @@ use fast_qr::{
     QRBuilder,
 };
 use std::{collections::{HashMap, HashSet}, time::Duration};
-use subxt::{dynamic, utils::AccountId32, OnlineClient, PolkadotConfig};
+use subxt::events::DecodeAsEvent;
+use subxt::utils::AccountId32;
 
 const MANAGE_ACCOUNTS_CSS: Asset = asset!("/assets/styling/manage_accounts.css");
 const BALANCE_RECONNECT_DELAY: Duration = Duration::from_secs(2);
@@ -90,18 +93,13 @@ fn decode_ss58(address: &str) -> Result<[u8; 32], String> {
     Ok(public.0)
 }
 
-/// Query free balance for a given SS58 address using dynamic value decoding.
 async fn fetch_balance_with_client(
-    client: &OnlineClient<PolkadotConfig>,
+    client: &AcuityClient,
     address: &str,
 ) -> Result<u128, String> {
-    use subxt::dynamic::Value;
-
     let addr_bytes = decode_ss58(address)?;
     let account_id = AccountId32(addr_bytes);
-
-    // Use the Value-typed dynamic storage query (no custom decode type needed)
-    let storage_addr = dynamic::storage::<(AccountId32,), Value>("System", "Account");
+    let storage_addr = api::storage().system().account();
 
     let at_block = client
         .at_current_block()
@@ -119,15 +117,11 @@ async fn fetch_balance_with_client(
         return Ok(0);
     };
 
-    let value = value_thunk
+    let account_info = value_thunk
         .decode()
         .map_err(|e| format!("Decode failed: {e}"))?;
 
-    // Navigate composite: { data: { free: u128, ... }, ... }
-    let free = extract_free_balance(&value)
-        .ok_or_else(|| "Could not read free balance from account storage value".to_string())?;
-
-    Ok(free)
+    Ok(account_info.data.free.into())
 }
 
 fn render_balance(balance: Option<&BalanceState>, fmt: &TokenFormat) -> Element {
@@ -195,9 +189,7 @@ async fn maintain_balance_subscription(
         .collect::<Result<HashMap<_, _>, _>>()
         .map_err(|error| error.to_string())?;
 
-    let client = OnlineClient::<PolkadotConfig>::from_insecure_url(ACUITY_NODE_URL)
-        .await
-        .map_err(|error| format!("Connection failed: {error}"))?;
+    let client = connect_acuity_client().await.map_err(|error| error.to_string())?;
 
     for address in addresses {
         match fetch_balance_with_client(&client, address).await {
@@ -234,45 +226,84 @@ async fn maintain_balance_subscription(
             let event = event
                 .map_err(|error| format!("Failed to decode finalized block event: {error}"))?;
 
-            match (event.pallet_name(), event.event_name()) {
-                ("Balances", "Transfer") => {
-                    track_event_accounts::<(AccountId32, AccountId32, u128)>(
-                        &event,
-                        &tracked_accounts,
-                        &mut changed_addresses,
-                        &[0, 1],
-                    );
-                }
-                ("Balances", "Deposit")
-                | ("Balances", "Withdraw")
-                | ("Balances", "Slashed")
-                | ("Balances", "Minted")
-                | ("Balances", "Burned") => {
-                    track_event_accounts::<(AccountId32, u128)>(
-                        &event,
-                        &tracked_accounts,
-                        &mut changed_addresses,
-                        &[0],
-                    );
-                }
-                ("Balances", "DustLost")
-                | ("Balances", "Endowed") => {
-                    track_event_accounts::<(AccountId32, u128)>(
-                        &event,
-                        &tracked_accounts,
-                        &mut changed_addresses,
-                        &[0],
-                    );
-                }
-                ("System", "KilledAccount") | ("System", "NewAccount") => {
-                    track_event_accounts::<(AccountId32,)>(
-                        &event,
-                        &tracked_accounts,
-                        &mut changed_addresses,
-                        &[0],
-                    );
-                }
-                _ => {}
+            if api::balances::events::Transfer::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Transfer>()
+                    .map_err(|error| format!("Failed to decode Balances::Transfer event: {error}"))?;
+                track_account_id(&decoded.from, &tracked_accounts, &mut changed_addresses);
+                track_account_id(&decoded.to, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Deposit::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Deposit>()
+                    .map_err(|error| format!("Failed to decode Balances::Deposit event: {error}"))?;
+                track_account_id(&decoded.who, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Withdraw::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Withdraw>()
+                    .map_err(|error| format!("Failed to decode Balances::Withdraw event: {error}"))?;
+                track_account_id(&decoded.who, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Slashed::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Slashed>()
+                    .map_err(|error| format!("Failed to decode Balances::Slashed event: {error}"))?;
+                track_account_id(&decoded.who, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Minted::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Minted>()
+                    .map_err(|error| format!("Failed to decode Balances::Minted event: {error}"))?;
+                track_account_id(&decoded.who, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Burned::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Burned>()
+                    .map_err(|error| format!("Failed to decode Balances::Burned event: {error}"))?;
+                track_account_id(&decoded.who, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::DustLost::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::DustLost>()
+                    .map_err(|error| format!("Failed to decode Balances::DustLost event: {error}"))?;
+                track_account_id(&decoded.account, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::balances::events::Endowed::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::balances::events::Endowed>()
+                    .map_err(|error| format!("Failed to decode Balances::Endowed event: {error}"))?;
+                track_account_id(&decoded.account, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::system::events::KilledAccount::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::system::events::KilledAccount>()
+                    .map_err(|error| format!("Failed to decode System::KilledAccount event: {error}"))?;
+                track_account_id(&decoded.account, &tracked_accounts, &mut changed_addresses);
+                continue;
+            }
+
+            if api::system::events::NewAccount::is_event(event.pallet_name(), event.event_name()) {
+                let decoded = event
+                    .decode_fields_unchecked_as::<api::system::events::NewAccount>()
+                    .map_err(|error| format!("Failed to decode System::NewAccount event: {error}"))?;
+                track_account_id(&decoded.account, &tracked_accounts, &mut changed_addresses);
             }
         }
 
@@ -291,67 +322,14 @@ async fn maintain_balance_subscription(
     Ok(())
 }
 
-fn track_event_accounts<E>(
-    event: &subxt::events::Event<PolkadotConfig>,
+fn track_account_id(
+    account: &AccountId32,
     tracked_accounts: &HashMap<[u8; 32], String>,
     changed_addresses: &mut HashSet<String>,
-    indexes: &[usize],
-) where
-    E: parity_scale_codec::Decode + subxt::ext::scale_decode::DecodeAsFields + EventAccounts,
-{
-    let Ok(decoded) = event.decode_fields_unchecked_as::<E>() else {
-        return;
-    };
-
-    for account in account_ids_from_tuple(&decoded, indexes) {
-        if let Some(address) = tracked_accounts.get(&account) {
-            changed_addresses.insert(address.clone());
-        }
+) {
+    if let Some(address) = tracked_accounts.get(&account.0) {
+        changed_addresses.insert(address.clone());
     }
-}
-
-trait EventAccounts {
-    fn account_ids(&self) -> Vec<[u8; 32]>;
-}
-
-impl EventAccounts for (AccountId32,) {
-    fn account_ids(&self) -> Vec<[u8; 32]> {
-        vec![self.0 .0]
-    }
-}
-
-impl EventAccounts for (AccountId32, u128) {
-    fn account_ids(&self) -> Vec<[u8; 32]> {
-        vec![self.0 .0]
-    }
-}
-
-impl EventAccounts for (AccountId32, AccountId32, u128) {
-    fn account_ids(&self) -> Vec<[u8; 32]> {
-        vec![self.0 .0, self.1 .0]
-    }
-}
-
-fn account_ids_from_tuple<E>(decoded: &E, indexes: &[usize]) -> Vec<[u8; 32]>
-where
-    E: EventAccounts,
-{
-    decoded
-        .account_ids()
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, account)| indexes.contains(&index).then_some(account))
-        .collect()
-}
-
-/// Walk a scale_value::Value composite to extract the `data.free` field as u128.
-fn extract_free_balance(value: &subxt::dynamic::Value) -> Option<u128> {
-    use subxt::ext::scale_value::At;
-    // Navigate: AccountInfo { data: AccountData { free: u128 } }
-    value
-        .at("data")
-        .and_then(|data| data.at("free"))
-        .and_then(|free| free.as_u128())
 }
 
 /// Generate a QR code SVG string for the given data.
