@@ -10,62 +10,13 @@ use dioxus::prelude::*;
 const NAVBAR_CSS: Asset = asset!("/assets/styling/navbar.css");
 const SIDEBAR_CSS: Asset = asset!("/assets/styling/sidebar.css");
 
-// ── Top navbar ────────────────────────────────────────────────────────────────
+// ── Layout ────────────────────────────────────────────────────────────────────
 
 #[component]
 pub fn Navbar() -> Element {
-    let account_store = use_context::<Signal<AccountStore>>();
-    let account_store_snap = account_store();
-
-    let active_account = account_store_snap.active_account().cloned();
-    let account_status_class = if account_store_snap.is_active_unlocked() {
-        "unlocked"
-    } else {
-        "locked"
-    };
-
-    let account_label = match active_account {
-        Some(account) => {
-            let address = short_address(&account.address);
-            if account_store_snap.is_active_unlocked() {
-                format!("{} ({address}) unlocked", account.name)
-            } else {
-                format!("{} ({address}) locked", account.name)
-            }
-        }
-        None => "No active account".to_string(),
-    };
-
     rsx! {
         document::Link { rel: "stylesheet", href: NAVBAR_CSS }
         document::Link { rel: "stylesheet", href: SIDEBAR_CSS }
-
-        div {
-            id: "navbar",
-            div {
-                class: "nav-links",
-                span { class: "brand", "Acuity" }
-                Link {
-                    to: Route::Home {},
-                    "Dashboard"
-                }
-                Link {
-                    to: Route::ManageAccounts {},
-                    "Accounts"
-                }
-                Link {
-                    to: Route::ProfileView {},
-                    "Profile"
-                }
-            }
-            div {
-                class: "nav-statuses",
-                div {
-                    class: "account-status {account_status_class}",
-                    "{account_label}"
-                }
-            }
-        }
 
         // Two-column body: sidebar on the left, outlet on the right
         div {
@@ -133,50 +84,54 @@ fn AccountSidebar() -> Element {
         aside {
             class: "account-sidebar",
 
-            p { class: "sidebar-heading", "Accounts" }
+            Link { class: "brand", to: Route::Home {}, "Acuity" }
 
-            if snap.accounts.is_empty() {
-                p { class: "sidebar-empty", "No accounts found." }
-            }
+            // Active account selector
+            div {
+                class: "sidebar-section",
+                if snap.accounts.is_empty() {
+                    p { class: "sidebar-empty", "No accounts found." }
+                }
 
-            for account in snap.accounts.clone() {
-                {
-                    let is_active = snap.active_account_id.as_deref() == Some(account.id.as_str());
-                    let is_unlocked = snap.is_account_unlocked(&account.id);
-                    let row_class = if is_active { "sidebar-account active" } else { "sidebar-account" };
-                    let select_id = account.id.clone();
-                    let padlock_id = account.id.clone();
+                for account in snap.accounts.clone() {
+                    {
+                        let is_active = snap.active_account_id.as_deref() == Some(account.id.as_str());
+                        let is_unlocked = snap.is_account_unlocked(&account.id);
+                        let row_class = if is_active { "sidebar-account active" } else { "sidebar-account" };
+                        let select_id = account.id.clone();
+                        let padlock_id = account.id.clone();
 
-                    rsx! {
-                        div {
-                            class: "{row_class}",
-                            // Clicking the row body selects the account
-                            button {
-                                class: "sidebar-account-body",
-                                onclick: move |_| {
-                                    account_store.with_mut(|store| select_active_account(store, &select_id));
-                                },
-                                span { class: "sidebar-account-name", "{account.name}" }
-                                span { class: "sidebar-account-addr", "{short_address(&account.address)}" }
-                            }
-                            // Padlock button
-                            if is_unlocked {
+                        rsx! {
+                            div {
+                                class: "{row_class}",
+                                // Clicking the row body selects the account
                                 button {
-                                    class: "padlock unlocked",
-                                    title: "Lock account",
+                                    class: "sidebar-account-body",
                                     onclick: move |_| {
-                                        account_store.with_mut(|store| lock_account(store, &padlock_id));
+                                        account_store.with_mut(|store| select_active_account(store, &select_id));
                                     },
-                                    "\u{1F513}" // 🔓
+                                    span { class: "sidebar-account-name", "{account.name}" }
+                                    span { class: "sidebar-account-addr", "{short_address(&account.address)}" }
                                 }
-                            } else {
-                                button {
-                                    class: "padlock locked",
-                                    title: "Unlock account",
-                                    onclick: move |_| {
-                                        unlock_target_id.set(Some(padlock_id.clone()));
-                                    },
-                                    "\u{1F512}" // 🔒
+                                // Padlock button
+                                if is_unlocked {
+                                    button {
+                                        class: "padlock unlocked",
+                                        title: "Lock account",
+                                        onclick: move |_| {
+                                            account_store.with_mut(|store| lock_account(store, &padlock_id));
+                                        },
+                                        "\u{1F513}" // 🔓
+                                    }
+                                } else {
+                                    button {
+                                        class: "padlock locked",
+                                        title: "Unlock account",
+                                        onclick: move |_| {
+                                            unlock_target_id.set(Some(padlock_id.clone()));
+                                        },
+                                        "\u{1F512}" // 🔒
+                                    }
                                 }
                             }
                         }
@@ -184,10 +139,26 @@ fn AccountSidebar() -> Element {
                 }
             }
 
-            // Services section
+            // Account section
+            div {
+                class: "sidebar-section",
+                p { class: "sidebar-heading", "Account" }
+                Link {
+                    class: "sidebar-nav-link",
+                    to: Route::ProfileView {},
+                    span { class: "sidebar-nav-label", "Profile" }
+                }
+            }
+
+            // Administration section
             div {
                 class: "sidebar-services-section",
-                p { class: "sidebar-heading", "Services" }
+                p { class: "sidebar-heading", "Administration" }
+                Link {
+                    class: "sidebar-nav-link",
+                    to: Route::ManageAccounts {},
+                    span { class: "sidebar-nav-label", "Accounts" }
+                }
                 Link {
                     class: "sidebar-nav-link",
                     to: Route::ChainStatus {},
