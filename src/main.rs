@@ -212,6 +212,7 @@ struct IndexerResponse {
 }
 
 mod accounts;
+mod acuity_runtime;
 mod profile;
 mod views;
 
