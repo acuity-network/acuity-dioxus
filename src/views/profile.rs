@@ -242,6 +242,7 @@ pub fn ProfileView() -> Element {
 
 #[component]
 pub fn ProfileEdit() -> Element {
+    let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
@@ -563,6 +564,7 @@ pub fn ProfileEdit() -> Element {
                                                     "Saved. The chain updates immediately; the indexer may take a moment to catch up."
                                                         .to_string(),
                                                 ));
+                                                navigator.push(Route::ProfileView {});
                                             }
                                             Err(err) => error_message.set(Some(err)),
                                         }
