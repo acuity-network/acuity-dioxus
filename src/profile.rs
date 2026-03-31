@@ -146,23 +146,14 @@ struct IndexerEnvelope {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct IndexerEventsResponse {
-    events: Vec<IndexerEventRef>,
     #[serde(default)]
-    block_events: Vec<IndexerBlockEvents>,
+    decoded_events: Vec<IndexerDecodedEvent>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct IndexerEventRef {
-    block_number: u32,
-    event_index: u16,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct IndexerBlockEvents {
-    block_number: u32,
-    events: Vec<serde_json::Value>,
+struct IndexerDecodedEvent {
+    event: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -571,30 +562,15 @@ async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, Strin
         let response = envelope
             .data
             .ok_or_else(|| "Indexer events response did not include any event data.".to_string())?;
-        if response.block_events.is_empty() {
+        if response.decoded_events.is_empty() {
             return Err(
-                "The indexer did not return stored block events. Enable event storage in the indexer so the dapp can resolve profile revisions."
+                "The indexer did not return stored events. Enable event storage in the indexer so the dapp can resolve profile revisions."
                     .to_string(),
             );
         }
 
-        for event_ref in response.events {
-            let Some(block) = response
-                .block_events
-                .iter()
-                .find(|block| block.block_number == event_ref.block_number)
-            else {
-                continue;
-            };
-
-            let Some(event_json) = block.events.iter().find(|event| {
-                event.get("eventIndex").and_then(|value| value.as_u64())
-                    == Some(u64::from(event_ref.event_index))
-            }) else {
-                continue;
-            };
-
-            let event = serde_json::from_value::<IndexerStoredEvent>(event_json.clone())
+        for decoded_event in response.decoded_events {
+            let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event)
                 .map_err(|error| format!("Failed to decode indexed event payload: {error}"))?;
             if event.pallet_name != "Content" || event.event_name != "PublishRevision" {
                 continue;
