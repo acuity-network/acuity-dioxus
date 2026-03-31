@@ -66,7 +66,7 @@ pub mod api {
     pub mod runtime_apis {
         use super::root_mod;
         use super::runtime_types;
-        use subxt::ext::codec::Encode;
+        use ::subxt::ext::codec::Encode;
         pub struct RuntimeApi;
         impl RuntimeApi {
             pub fn core(&self) -> core::Core {
