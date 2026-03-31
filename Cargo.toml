@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 bs58 = "0.5"
 dioxus = { version = "0.7.1", features = ["router"] }
+fast_qr = { version = "0.12", features = ["svg"] }
 futures = "0.3"
 base64 = "0.22"
 crypto_secretbox = { version = "0.1.1", features = ["alloc", "salsa20"] }

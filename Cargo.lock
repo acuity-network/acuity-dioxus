@@ -16,6 +16,7 @@ dependencies = [
  "bs58",
  "crypto_secretbox",
  "dioxus",
+ "fast_qr",
  "futures",
  "hex",
  "home",
@@ -2546,6 +2547,12 @@ dependencies = [
  "event-listener",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "fast_qr"
+version = "0.12.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16e326670ab63ef13c7699301dbb3441573ba3288e83c3bb9efaacc91a33fd01"
 
 [[package]]
 name = "fastrand"

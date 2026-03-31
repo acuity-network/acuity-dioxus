@@ -10,6 +10,9 @@ pub use indexer_status::IndexerStatus;
 mod ipfs_status;
 pub use ipfs_status::IpfsStatus;
 
+mod manage_accounts;
+pub use manage_accounts::{CreateAccount, ManageAccounts};
+
 mod navbar;
 pub use navbar::Navbar;
 

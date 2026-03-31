@@ -103,6 +103,10 @@ pub fn Navbar() -> Element {
                     "Dashboard"
                 }
                 Link {
+                    to: Route::ManageAccounts {},
+                    "Accounts"
+                }
+                Link {
                     to: Route::ProfileView {},
                     "Profile"
                 }

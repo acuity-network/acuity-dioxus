@@ -354,6 +354,37 @@ pub fn delete_active_account(store: &mut AccountStore) {
     store.set_notice(format!("Deleted {}.", account.name));
 }
 
+/// Delete any account by id (not just the active one).
+pub fn delete_account(store: &mut AccountStore, account_id: &str) {
+    let Some(account_index) = store
+        .accounts
+        .iter()
+        .position(|account| account.id == account_id)
+    else {
+        store.set_error("That account is no longer available.");
+        return;
+    };
+
+    let account = store.accounts[account_index].clone();
+    if let Err(error) = fs::remove_file(&account.path) {
+        store.set_error(format!("Failed to delete account file: {error}"));
+        return;
+    }
+
+    store.accounts.remove(account_index);
+    store.unlocked_signers.remove(account_id);
+
+    // If the deleted account was active, select another one
+    if store.active_account_id.as_deref() == Some(account_id) {
+        store.active_account_id = store
+            .accounts
+            .first()
+            .map(|next_account| next_account.id.clone());
+    }
+
+    store.set_notice(format!("Deleted {}.", account.name));
+}
+
 impl AccountStore {
     fn accounts_dir_path(&self) -> Result<PathBuf, String> {
         let Some(accounts_dir) = self.accounts_dir.as_deref() else {

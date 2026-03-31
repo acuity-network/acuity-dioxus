@@ -7,7 +7,10 @@ use subxt::{OnlineClient, PolkadotConfig};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use accounts::load_account_store;
-use views::{ChainStatus, Home, IndexerStatus, IpfsStatus, Navbar, ProfileEdit, ProfileView};
+use views::{
+    ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ManageAccounts, Navbar,
+    ProfileEdit, ProfileView,
+};
 
 pub(crate) const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
 pub(crate) const INDEXER_URL: &str = "ws://127.0.0.1:8172";
@@ -214,6 +217,10 @@ enum Route {
     #[layout(Navbar)]
         #[route("/")]
         Home {},
+        #[route("/accounts")]
+        ManageAccounts {},
+        #[route("/accounts/create")]
+        CreateAccount {},
         #[route("/profile")]
         ProfileView {},
         #[route("/profile/edit")]
