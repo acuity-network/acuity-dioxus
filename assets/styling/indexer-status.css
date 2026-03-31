@@ -1,83 +1,95 @@
 .indexer-shell {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .panel-surface {
   border: 1px solid rgba(145, 164, 210, 0.16);
-  border-radius: 24px;
+  border-radius: 20px;
   background: linear-gradient(180deg, rgba(20, 25, 34, 0.9) 0%, rgba(14, 18, 25, 0.96) 100%);
-  box-shadow: 0 20px 50px rgba(4, 10, 22, 0.34);
+  box-shadow: 0 12px 32px rgba(4, 10, 22, 0.28);
 }
 
-.indexer-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
-  gap: 18px;
-  padding: 28px;
-}
-
-.hero-copy h1,
-.panel-heading h2 {
-  margin: 0;
-  color: #f7fbff;
-}
-
-.eyebrow,
 .label {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: #8fb7ff;
+  color: rgba(143, 183, 255, 0.7);
 }
 
-.hero-text,
-.status-copy,
-.banner-copy,
-.empty-state,
-.info-value,
-.field-value,
-.span-title,
-.span-meta {
-  margin: 0;
-  color: rgba(235, 242, 255, 0.82);
-  line-height: 1.6;
-}
+/* ── Status bar ───────────────────────────────────────────────────────────── */
 
-.hero-copy,
-.hero-status-card,
-.overview-panel,
-.coverage-panel,
-.spans-panel {
+.status-bar {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
 }
 
-.hero-status-card {
-  padding: 20px;
-  border-radius: 20px;
-  background: radial-gradient(circle at top right, rgba(91, 132, 226, 0.18), transparent 45%), rgba(9, 14, 23, 0.88);
-  border: 1px solid rgba(144, 166, 215, 0.18);
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
-  padding: 10px 16px;
+  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-bar-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-bar-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f0f4ff;
+}
+
+.status-bar-url {
+  font-size: 0.8rem;
+  color: rgba(180, 199, 241, 0.55);
+  font-family: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-bar-meta-label {
+  font-size: 0.78rem;
+  color: rgba(143, 183, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-bar-meta-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(210, 224, 255, 0.75);
 }
 
 .status-badge.connected,
 .info-card.connected {
   color: #dbffe4;
-  background: rgba(78, 183, 104, 0.12);
-  border-color: rgba(78, 183, 104, 0.22);
+  background: rgba(78, 183, 104, 0.14);
+  border-color: rgba(78, 183, 104, 0.28);
 }
 
 .status-badge.connecting,
@@ -85,8 +97,8 @@
 .info-card.connecting,
 .info-card.reconnecting {
   color: #fff3d4;
-  background: rgba(212, 154, 42, 0.12);
-  border-color: rgba(212, 154, 42, 0.22);
+  background: rgba(212, 154, 42, 0.14);
+  border-color: rgba(212, 154, 42, 0.28);
 }
 
 .indexer-banner {
@@ -94,6 +106,14 @@
   border-radius: 20px;
   border: 1px solid rgba(212, 154, 42, 0.24);
   background: rgba(212, 154, 42, 0.1);
+}
+
+.panel-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: #f0f4ff;
+  letter-spacing: -0.01em;
 }
 
 .banner-title-row,
@@ -135,7 +155,21 @@
 .overview-panel,
 .coverage-panel,
 .spans-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 24px;
+}
+
+.banner-copy,
+.empty-state,
+.info-value,
+.field-value,
+.span-title,
+.span-meta {
+  margin: 0;
+  color: rgba(235, 242, 255, 0.82);
+  line-height: 1.6;
 }
 
 .facts-grid {
@@ -208,15 +242,25 @@
 }
 
 @media (max-width: 900px) {
-  .indexer-hero,
   .indexer-grid,
   .facts-grid {
     grid-template-columns: 1fr;
   }
 }
 
+@media (max-width: 720px) {
+  .status-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .facts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
-  .indexer-hero,
   .overview-panel,
   .coverage-panel,
   .spans-panel {

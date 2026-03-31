@@ -8,22 +8,10 @@ pub fn IndexerStatus() -> Element {
     let indexer_connection = use_context::<Signal<IndexerConnection>>();
     let indexer_connection = indexer_connection();
 
-    let (status_badge_class, status_label, status_copy) = match indexer_connection.status {
-        ConnectionStatus::Connected => (
-            "connected",
-            "Connected",
-            "The websocket session is live and the dapp is subscribed to indexer status updates.",
-        ),
-        ConnectionStatus::Connecting => (
-            "connecting",
-            "Connecting",
-            "The app is opening a websocket session to the local indexer and waiting for the first span snapshot.",
-        ),
-        ConnectionStatus::Reconnecting => (
-            "reconnecting",
-            "Reconnecting",
-            "The last indexer session dropped, so the app is retrying until the websocket comes back.",
-        ),
+    let (status_badge_class, status_label) = match indexer_connection.status {
+        ConnectionStatus::Connected => ("connected", "Connected"),
+        ConnectionStatus::Connecting => ("connecting", "Connecting"),
+        ConnectionStatus::Reconnecting => ("reconnecting", "Reconnecting"),
     };
 
     let latest_indexed_block = indexer_connection
@@ -87,25 +75,23 @@ pub fn IndexerStatus() -> Element {
 
         div {
             class: "indexer-shell",
-            section {
-                class: "indexer-hero panel-surface",
+
+            // ── Compact status bar ──────────────────────────────────────────
+            div {
+                class: "status-bar panel-surface",
                 div {
-                    class: "hero-copy",
-                    p { class: "eyebrow", "Indexer control plane" }
-                    h1 { "Monitor the local indexer in real time" }
-                    p {
-                        class: "hero-text",
-                        "This page expands the indexer pill in the header into a live view of websocket health and the block spans currently indexed by the node-side service."
+                    class: "status-bar-left",
+                    div { class: "status-badge {status_badge_class}", "{status_label}" }
+                    div {
+                        class: "status-bar-title",
+                        span { class: "status-bar-name", "Acuity Indexer" }
+                        span { class: "status-bar-url", "{INDEXER_URL}" }
                     }
                 }
                 div {
-                    class: "hero-status-card",
-                    p { class: "label", "Live status" }
-                    div {
-                        class: "status-badge {status_badge_class}",
-                        "{status_label}"
-                    }
-                    p { class: "status-copy", "{status_copy}" }
+                    class: "status-bar-right",
+                    span { class: "status-bar-meta-label", "Reconnect delay" }
+                    span { class: "status-bar-meta-value", "{RECONNECT_DELAY.as_secs()}s" }
                 }
             }
 
