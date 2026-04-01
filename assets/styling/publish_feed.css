@@ -1,0 +1,15 @@
+/* ── Publish feed form ────────────────────────────────────────────────────── */
+
+.publish-feed-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.publish-feed-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 26px;
+  max-width: 640px;
+}

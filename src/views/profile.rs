@@ -1,8 +1,8 @@
 use crate::{
     accounts::AccountStore,
+    content::{preview_data_url_for_path, SelectedImage},
     profile::{
-        load_profile_for_account, preview_data_url_for_path, save_profile, LoadedProfile,
-        ProfileDraft, SaveProfileRequest, SelectedImage,
+        load_profile_for_account, save_profile, LoadedProfile, ProfileDraft, SaveProfileRequest,
     },
     Route,
 };

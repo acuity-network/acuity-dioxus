@@ -148,6 +148,11 @@ fn AccountSidebar() -> Element {
                     to: Route::ProfileView {},
                     span { class: "sidebar-nav-label", "Profile" }
                 }
+                Link {
+                    class: "sidebar-nav-link",
+                    to: Route::PublishFeed {},
+                    span { class: "sidebar-nav-label", "Publish Feed" }
+                }
             }
 
             // Administration section

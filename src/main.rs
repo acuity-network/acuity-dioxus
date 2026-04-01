@@ -9,8 +9,8 @@ use acuity_runtime::api;
 use accounts::load_account_store;
 use runtime_client::connect as connect_acuity_client;
 use views::{
-    ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ManageAccounts, Navbar,
-    ProfileEdit, ProfileView,
+    ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ItemView, ManageAccounts, Navbar,
+    ProfileEdit, ProfileView, PublishFeed,
 };
 
 pub(crate) const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
@@ -212,6 +212,8 @@ struct IndexerResponse {
 
 mod accounts;
 mod acuity_runtime;
+mod content;
+mod feed;
 mod profile;
 mod runtime_client;
 mod views;
@@ -230,6 +232,10 @@ enum Route {
         ProfileView {},
         #[route("/profile/edit")]
         ProfileEdit {},
+        #[route("/feed/publish")]
+        PublishFeed {},
+        #[route("/item/:encoded_item_id")]
+        ItemView { encoded_item_id: String },
         #[route("/chain")]
         ChainStatus {},
         #[route("/indexer")]

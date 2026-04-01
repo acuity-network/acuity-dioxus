@@ -1,0 +1,83 @@
+/* ── Item view page ──────────────────────────────────────────────────────── */
+
+.item-view-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.item-view-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ── Left: content card ──────────────────────────────────────────────────── */
+
+.item-view-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px;
+}
+
+.iv-title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 1.9rem);
+  color: #f5f8ff;
+}
+
+.iv-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c5d8ff;
+  background: rgba(80, 120, 200, 0.18);
+  border: 1px solid rgba(100, 149, 230, 0.26);
+  width: fit-content;
+}
+
+.iv-body {
+  margin: 0;
+  font-size: 0.97rem;
+  line-height: 1.65;
+  color: rgba(226, 233, 248, 0.82);
+  max-width: 68ch;
+  white-space: pre-wrap;
+}
+
+.iv-image {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 1px solid rgba(145, 164, 210, 0.16);
+}
+
+/* ── Right: metadata ─────────────────────────────────────────────────────── */
+
+.item-view-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .item-view-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .item-view-main,
+  .item-view-side {
+    padding: 18px;
+  }
+}
