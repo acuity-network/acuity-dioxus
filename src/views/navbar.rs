@@ -24,11 +24,20 @@ pub fn Navbar() -> Element {
         div {
             class: "app-body",
             tabindex: "-1",
+            onmounted: move |e| {
+                spawn(async move { let _ = e.set_focus(true).await; });
+            },
             onkeydown: move |e: KeyboardEvent| {
                 if e.modifiers().alt() {
                     match e.key() {
-                        Key::ArrowLeft  => { nav.go_back(); }
-                        Key::ArrowRight => { nav.go_forward(); }
+                        Key::ArrowLeft => {
+                            e.prevent_default();
+                            nav.go_back();
+                        }
+                        Key::ArrowRight => {
+                            e.prevent_default();
+                            nav.go_forward();
+                        }
                         _ => {}
                     }
                 }
