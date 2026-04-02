@@ -226,6 +226,119 @@
   max-width: 640px;
 }
 
+/* ── Reactions ───────────────────────────────────────────────────────────── */
+
+.reactions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.reactions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(100, 149, 230, 0.28);
+  background: rgba(40, 60, 120, 0.18);
+  color: #c5d8ff;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.reaction-chip:hover:not(:disabled) {
+  background: rgba(80, 120, 200, 0.28);
+  border-color: rgba(120, 165, 240, 0.50);
+}
+
+.reaction-chip.reacted {
+  background: rgba(80, 130, 220, 0.30);
+  border-color: rgba(140, 180, 255, 0.55);
+  color: #e8f0ff;
+  font-weight: 600;
+}
+
+.reaction-chip:disabled,
+.reaction-add:disabled,
+.picker-emoji:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reaction-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px dashed rgba(100, 149, 230, 0.35);
+  background: transparent;
+  color: rgba(180, 200, 240, 0.60);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.reaction-add:hover:not(:disabled) {
+  background: rgba(60, 100, 190, 0.18);
+  border-color: rgba(120, 165, 240, 0.55);
+  color: #c5d8ff;
+}
+
+.reaction-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(100, 149, 230, 0.22);
+  background: rgba(20, 30, 60, 0.80);
+  backdrop-filter: blur(6px);
+  max-width: 320px;
+}
+
+.picker-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  line-height: 1;
+}
+
+.picker-emoji:hover:not(:disabled) {
+  background: rgba(80, 120, 200, 0.22);
+  border-color: rgba(100, 149, 230, 0.30);
+}
+
+.reactions-tx-error {
+  margin-bottom: 0;
+}
+
+.reactions-loading {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(180, 200, 240, 0.50);
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
