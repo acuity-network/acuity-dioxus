@@ -28,6 +28,10 @@
   justify-content: flex-end;
 }
 
+.app-body:focus {
+  outline: none;
+}
+
 .brand {
   font-size: 1rem;
   font-weight: 700;

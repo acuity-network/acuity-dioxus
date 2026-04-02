@@ -14,6 +14,8 @@ const SIDEBAR_CSS: Asset = asset!("/assets/styling/sidebar.css");
 
 #[component]
 pub fn Navbar() -> Element {
+    let nav = use_navigator();
+
     rsx! {
         document::Link { rel: "stylesheet", href: NAVBAR_CSS }
         document::Link { rel: "stylesheet", href: SIDEBAR_CSS }
@@ -21,6 +23,16 @@ pub fn Navbar() -> Element {
         // Two-column body: sidebar on the left, outlet on the right
         div {
             class: "app-body",
+            tabindex: "-1",
+            onkeydown: move |e: KeyboardEvent| {
+                if e.modifiers().alt() {
+                    match e.key() {
+                        Key::ArrowLeft  => { nav.go_back(); }
+                        Key::ArrowRight => { nav.go_forward(); }
+                        _ => {}
+                    }
+                }
+            },
             AccountSidebar {}
             div {
                 class: "app-content",
