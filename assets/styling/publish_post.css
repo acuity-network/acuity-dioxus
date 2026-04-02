@@ -1,0 +1,41 @@
+/* ── Publish post form ────────────────────────────────────────────────────── */
+
+.publish-post-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.publish-post-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 26px;
+  max-width: 640px;
+}
+
+.publish-post-feed-context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  background: rgba(80, 120, 200, 0.10);
+  border: 1px solid rgba(100, 149, 230, 0.18);
+  font-size: 0.92rem;
+  color: rgba(226, 233, 248, 0.82);
+}
+
+.publish-post-feed-label {
+  font-weight: 600;
+  color: #c5d8ff;
+  white-space: nowrap;
+}
+
+.publish-post-feed-title {
+  color: #f5f8ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

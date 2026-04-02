@@ -10,7 +10,7 @@ use accounts::load_account_store;
 use runtime_client::connect as connect_acuity_client;
 use views::{
     ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ItemView, ManageAccounts, Navbar,
-    ProfileEdit, ProfileView, PublishFeed,
+    ProfileEdit, ProfileView, PublishFeed, PublishPost,
 };
 
 pub(crate) const ACUITY_NODE_URL: &str = "ws://127.0.0.1:9944";
@@ -214,6 +214,7 @@ mod accounts;
 mod acuity_runtime;
 mod content;
 mod feed;
+mod post;
 mod profile;
 mod runtime_client;
 mod views;
@@ -234,6 +235,8 @@ enum Route {
         ProfileEdit {},
         #[route("/feed/publish")]
         PublishFeed {},
+        #[route("/feed/:encoded_feed_id/publish-post")]
+        PublishPost { encoded_feed_id: String },
         #[route("/item/:encoded_item_id")]
         ItemView { encoded_item_id: String },
         #[route("/chain")]

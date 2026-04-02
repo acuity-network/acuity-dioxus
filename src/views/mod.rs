@@ -24,3 +24,6 @@ pub use profile::{ProfileEdit, ProfileView};
 
 mod publish_feed;
 pub use publish_feed::PublishFeed;
+
+mod publish_post;
+pub use publish_post::PublishPost;

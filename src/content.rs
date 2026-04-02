@@ -424,6 +424,65 @@ where
 
 // ── Indexer helpers ───────────────────────────────────────────────────────────
 
+/// Fetches all decoded events from the indexer for a given `item_id`.
+///
+/// Returns the full list of `IndexerDecodedEvent` entries in reverse
+/// chronological order (newest first), up to the indexer's per-query limit.
+pub async fn fetch_events_for_item(
+    item_id_hex: String,
+) -> Result<Vec<IndexerDecodedEvent>, String> {
+    let (mut stream, _) = connect_async(INDEXER_URL)
+        .await
+        .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
+
+    let request = IndexerEventsRequest {
+        message_type: "GetEvents",
+        key: IndexerKey::Custom(IndexerCustomKey {
+            name: "item_id",
+            kind: "bytes32",
+            value: item_id_hex,
+        }),
+    };
+
+    stream
+        .send(WsMessage::Text(
+            serde_json::to_string(&request)
+                .map_err(|error| format!("Failed to encode indexer request: {error}"))?
+                .into(),
+        ))
+        .await
+        .map_err(|error| format!("Failed to query the indexer: {error}"))?;
+
+    while let Some(message) = stream.next().await {
+        let message =
+            message.map_err(|error| format!("Failed to read indexer response: {error}"))?;
+
+        let payload = match message {
+            WsMessage::Text(text) => text.to_string(),
+            WsMessage::Binary(bytes) => std::str::from_utf8(&bytes)
+                .map_err(|error| format!("Indexer returned invalid UTF-8: {error}"))?
+                .to_string(),
+            WsMessage::Close(_) => break,
+            WsMessage::Ping(_) | WsMessage::Pong(_) | WsMessage::Frame(_) => continue,
+        };
+
+        let envelope = serde_json::from_str::<IndexerEnvelope>(&payload)
+            .map_err(|error| format!("Failed to decode indexer event response: {error}"))?;
+
+        if envelope.message_type != "events" {
+            continue;
+        }
+
+        let response = envelope
+            .data
+            .ok_or_else(|| "Indexer events response did not include any event data.".to_string())?;
+
+        return Ok(response.decoded_events);
+    }
+
+    Err("The indexer closed the websocket before returning events.".to_string())
+}
+
 pub async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, String> {
     let (mut stream, _) = connect_async(INDEXER_URL)
         .await
