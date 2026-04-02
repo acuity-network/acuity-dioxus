@@ -45,6 +45,14 @@ struct LoadedItem {
     body_text: String,
     language: String,
     image_preview_data_url: Option<String>,
+    parents: Vec<ParentSummary>,
+}
+
+#[derive(Clone, PartialEq)]
+struct ParentSummary {
+    encoded_item_id: String,
+    title: String,
+    content_type: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -103,6 +111,9 @@ async fn load_item(encoded_item_id: &str) -> Result<LoadedItem, String> {
         None
     };
 
+    // Load parent summaries from the item's own PublishItem indexer event.
+    let parents = load_parent_summaries(&item_id_hex).await.unwrap_or_default();
+
     Ok(LoadedItem {
         encoded_item_id: encoded_item_id.to_string(),
         item_id_hex,
@@ -112,6 +123,101 @@ async fn load_item(encoded_item_id: &str) -> Result<LoadedItem, String> {
         body_text,
         language,
         image_preview_data_url,
+        parents,
+    })
+}
+
+/// Finds this item's own `Content::PublishItem` event in the indexer and
+/// returns a lightweight summary for each declared parent.  Parents that
+/// fail to load are silently skipped.
+async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummary>, String> {
+    let decoded_events = fetch_events_for_item(item_id_hex.to_string()).await?;
+
+    // Find the PublishItem event whose item_id matches this item (not a child).
+    let mut parent_hex_ids: Vec<String> = Vec::new();
+    for decoded_event in &decoded_events {
+        let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event.clone())
+            .unwrap_or_else(|_| IndexerStoredEvent {
+                pallet_name: String::new(),
+                event_name: String::new(),
+                fields: serde_json::Value::Null,
+            });
+
+        if event.pallet_name != "Content" || event.event_name != "PublishItem" {
+            continue;
+        }
+
+        let event_item_id = event
+            .fields
+            .get("item_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
+
+        // Only process the event that belongs to *this* item, not child items.
+        if event_item_id != item_id_hex {
+            continue;
+        }
+
+        // Extract the parents array — the indexer stores it as a JSON array
+        // of hex strings or objects with an inner value field.
+        if let Some(parents_val) = event.fields.get("parents") {
+            if let Some(arr) = parents_val.as_array() {
+                for entry in arr {
+                    // Try plain string first, then {"0": "0xabc..."} or nested.
+                    let hex = if let Some(s) = entry.as_str() {
+                        s.to_string()
+                    } else if let Some(s) = entry.get("0").and_then(|v| v.as_str()) {
+                        s.to_string()
+                    } else {
+                        continue;
+                    };
+                    if !hex.is_empty() {
+                        parent_hex_ids.push(hex);
+                    }
+                }
+            }
+        }
+
+        // There is only one PublishItem event for this item; stop after it.
+        break;
+    }
+
+    let mut summaries = Vec::new();
+    for parent_hex in parent_hex_ids {
+        match load_parent_summary(&parent_hex).await {
+            Ok(summary) => summaries.push(summary),
+            Err(_) => continue,
+        }
+    }
+
+    Ok(summaries)
+}
+
+async fn load_parent_summary(item_id_hex: &str) -> Result<ParentSummary, String> {
+    let revision_hash = fetch_latest_revision_hash(item_id_hex.to_string()).await?;
+    let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
+    let item = ItemMessage::decode(item_bytes.as_slice())
+        .map_err(|error| format!("Failed to decode parent item payload: {error}"))?;
+
+    let content_type = content_type_label(&item).to_string();
+    let title = decode_single_mixin::<TitleMixinMessage>(&item, TITLE_MIXIN_ID)
+        .map(|m| m.title)
+        .unwrap_or_default();
+
+    // Use shortened hex as fallback display name when there is no title.
+    let display_title = if title.trim().is_empty() {
+        short_hex(item_id_hex)
+    } else {
+        title
+    };
+
+    let item_id_bytes = hex_to_bytes32(item_id_hex)?;
+    let encoded_item_id = bs58::encode(item_id_bytes).into_string();
+
+    Ok(ParentSummary {
+        encoded_item_id,
+        title: display_title,
+        content_type,
     })
 }
 
@@ -307,6 +413,23 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                     // ── Left: content ──────────────────────────────────────
                     section {
                         class: "panel-surface item-view-main",
+
+                        // Parent links
+                        if !item.parents.is_empty() {
+                            div { class: "iv-parents",
+                                span { class: "iv-parents-label", "In" }
+                                for parent in item.parents.clone() {
+                                    Link {
+                                        class: "iv-parent-link",
+                                        to: Route::ItemView {
+                                            encoded_item_id: parent.encoded_item_id.clone(),
+                                        },
+                                        span { class: "iv-parent-type", "{parent.content_type}" }
+                                        span { class: "iv-parent-title", "{parent.title}" }
+                                    }
+                                }
+                            }
+                        }
 
                         // Image
                         if let Some(img_url) = item.image_preview_data_url.clone() {

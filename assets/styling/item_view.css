@@ -67,6 +67,59 @@
   padding: 22px;
 }
 
+/* ── Parent links ────────────────────────────────────────────────────────── */
+
+.iv-parents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.iv-parents-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(180, 200, 240, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.iv-parent-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 149, 230, 0.28);
+  background: rgba(60, 100, 190, 0.12);
+  text-decoration: none;
+  color: #c5d8ff;
+  font-size: 0.86rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.iv-parent-link:hover {
+  background: rgba(80, 130, 220, 0.22);
+  border-color: rgba(120, 165, 240, 0.45);
+}
+
+.iv-parent-type {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(160, 190, 240, 0.70);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.iv-parent-title {
+  color: #d8e8ff;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
 /* ── Feed posts list ─────────────────────────────────────────────────────── */
 
 .iv-feed-posts-section {
