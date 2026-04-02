@@ -5,11 +5,13 @@ use subxt::events::DecodeAsEvent;
 
 use crate::accounts::AccountStore;
 use crate::content::{
-    account_id_from_ss58, build_image_mixin, bytes32_to_hex, derive_item_id, hex_to_bytes32,
-    upload_ipfs_digest, BodyTextMixinMessage, ItemMessage, LanguageMixinMessage,
-    MixinPayloadMessage, SelectedImage, TitleMixinMessage, BODY_TEXT_MIXIN_ID,
-    DEFAULT_LANGUAGE_TAG, IMAGE_MIXIN_ID, LANGUAGE_MIXIN_ID, TITLE_MIXIN_ID,
+    account_id_from_ss58, build_image_mixin, bytes32_to_hex, decode_single_mixin, derive_item_id,
+    fetch_ipfs_digest_bytes, fetch_latest_revision_hash, hex_to_bytes32,
+    preview_data_url_for_image_mixin, upload_ipfs_digest, BodyTextMixinMessage, ItemMessage,
+    LanguageMixinMessage, MixinPayloadMessage, SelectedImage, TitleMixinMessage,
+    BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, IMAGE_MIXIN_ID, LANGUAGE_MIXIN_ID, TITLE_MIXIN_ID,
 };
+use crate::profile::PROFILE_MIXIN_ID;
 
 /// Mixin ID for the feed type marker (no payload).
 pub const FEED_TYPE_MIXIN_ID: u32 = 0xbcec_8faa;
@@ -33,6 +35,131 @@ pub struct PublishFeedRequest {
 pub struct PublishedFeed {
     pub item_id: [u8; 32],
     pub item_id_hex: String,
+}
+
+/// A lightweight summary of a single content item registered in `pallet-account-content`.
+#[derive(Clone, PartialEq)]
+pub struct LoadedFeedSummary {
+    pub item_id_hex: String,
+    /// Base-58 encoded item ID, used as the `encoded_item_id` route parameter.
+    pub encoded_item_id: String,
+    pub title: String,
+    pub description_preview: String,
+    pub image_preview_data_url: Option<String>,
+    /// Human-readable type label: "Feed", "Profile", or "Content".
+    pub content_type: &'static str,
+}
+
+/// Fetches every item ID registered against `address` in `pallet-account-content`,
+/// then resolves each one through the indexer and IPFS to produce a summary card.
+///
+/// Items that fail to load are silently skipped so that one bad item cannot
+/// prevent the rest from appearing.
+pub async fn fetch_account_content_items(
+    address: &str,
+) -> Result<Vec<LoadedFeedSummary>, String> {
+    let account_id = account_id_from_ss58(address)?;
+    let storage_account_id = subxt::utils::AccountId32(account_id.into());
+
+    // ── 1. Read the on-chain list of item IDs ──────────────────────────────
+    let client = connect_acuity_client().await?;
+    let at_block = client
+        .at_current_block()
+        .await
+        .map_err(|error| format!("Failed to access the latest block for storage: {error}"))?;
+
+    let storage_address = api::storage().account_content().account_item_ids();
+    let maybe_ids = at_block
+        .storage()
+        .try_fetch(&storage_address, (storage_account_id,))
+        .await
+        .map_err(|error| format!("Failed to fetch account content item IDs: {error}"))?;
+
+    let item_ids = match maybe_ids {
+        Some(encoded) => {
+            let bounded_vec = encoded
+                .decode()
+                .map_err(|error| format!("Failed to decode account content item IDs: {error}"))?;
+            bounded_vec.0
+        }
+        None => return Ok(Vec::new()),
+    };
+
+    // ── 2. Resolve each item through the indexer and IPFS ─────────────────
+    let mut summaries = Vec::new();
+    for item_id_wrapper in item_ids {
+        let item_id: [u8; 32] = item_id_wrapper.0;
+        let item_id_hex = bytes32_to_hex(&item_id);
+
+        let summary = resolve_item_summary(item_id, &item_id_hex).await;
+        match summary {
+            Ok(s) => summaries.push(s),
+            Err(_) => continue, // skip items that fail to load
+        }
+    }
+
+    Ok(summaries)
+}
+
+async fn resolve_item_summary(
+    item_id: [u8; 32],
+    item_id_hex: &str,
+) -> Result<LoadedFeedSummary, String> {
+    let revision_hash = fetch_latest_revision_hash(item_id_hex.to_string()).await?;
+    let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
+    let item = ItemMessage::decode(item_bytes.as_slice())
+        .map_err(|error| format!("Failed to decode item payload: {error}"))?;
+
+    let content_type = item_content_type_label(&item);
+
+    let title = decode_single_mixin::<TitleMixinMessage>(&item, TITLE_MIXIN_ID)
+        .map(|m| m.title)
+        .unwrap_or_default();
+
+    let body_text = decode_single_mixin::<BodyTextMixinMessage>(&item, BODY_TEXT_MIXIN_ID)
+        .map(|m| m.body_text)
+        .unwrap_or_default();
+
+    let description_preview = if body_text.len() > 160 {
+        format!("{}...", &body_text[..160])
+    } else {
+        body_text
+    };
+
+    let image_mixin_payload = item
+        .mixin_payload
+        .iter()
+        .find(|m| m.mixin_id == IMAGE_MIXIN_ID)
+        .map(|m| m.payload.clone());
+
+    let image_preview_data_url = if let Some(ref payload) = image_mixin_payload {
+        preview_data_url_for_image_mixin(payload).await.unwrap_or(None)
+    } else {
+        None
+    };
+
+    let encoded_item_id = bs58::encode(item_id).into_string();
+
+    Ok(LoadedFeedSummary {
+        item_id_hex: item_id_hex.to_string(),
+        encoded_item_id,
+        title,
+        description_preview,
+        image_preview_data_url,
+        content_type,
+    })
+}
+
+fn item_content_type_label(item: &ItemMessage) -> &'static str {
+    for mixin in &item.mixin_payload {
+        if mixin.mixin_id == FEED_TYPE_MIXIN_ID {
+            return "Feed";
+        }
+        if mixin.mixin_id == PROFILE_MIXIN_ID {
+            return "Profile";
+        }
+    }
+    "Content"
 }
 
 pub async fn publish_feed(

@@ -1,6 +1,7 @@
 use crate::{
     accounts::AccountStore,
     content::{preview_data_url_for_path, SelectedImage},
+    feed::{fetch_account_content_items, LoadedFeedSummary},
     profile::{
         load_profile_for_account, save_profile, LoadedProfile, ProfileDraft, SaveProfileRequest,
     },
@@ -49,12 +50,18 @@ pub fn ProfileView() -> Element {
     let mut is_loading = use_signal(|| false);
     let mut error_message: Signal<Option<String>> = use_signal(|| None);
 
+    // ── Pinned content items state ─────────────────────────────────────────
+    let mut content_items: Signal<Vec<LoadedFeedSummary>> = use_signal(Vec::new);
+    let mut content_loading = use_signal(|| false);
+    let mut content_error: Signal<Option<String>> = use_signal(|| None);
+
     let active_address = use_memo(move || {
         account_store()
             .active_account()
             .map(|a| a.address.clone())
     });
 
+    // Load profile when address changes
     use_effect(move || {
         let address = active_address();
         spawn(async move {
@@ -72,6 +79,24 @@ pub fn ProfileView() -> Element {
                 }
             }
             is_loading.set(false);
+        });
+    });
+
+    // Load pinned content items when address changes
+    use_effect(move || {
+        let address = active_address();
+        spawn(async move {
+            content_error.set(None);
+            content_items.set(Vec::new());
+            let Some(address) = address else {
+                return;
+            };
+            content_loading.set(true);
+            match fetch_account_content_items(&address).await {
+                Ok(items) => content_items.set(items),
+                Err(err) => content_error.set(Some(err)),
+            }
+            content_loading.set(false);
         });
     });
 
@@ -231,6 +256,61 @@ pub fn ProfileView() -> Element {
                         class: "btn-primary",
                         to: Route::ProfileEdit {},
                         "Edit profile"
+                    }
+                }
+            }
+
+            // ── Pinned Content section ─────────────────────────────────────
+            if active_account.is_some() {
+                section { class: "pv-content-section",
+
+                    h3 { class: "pv-content-heading", "Pinned Content" }
+
+                    if let Some(ref err) = content_error() {
+                        div { class: "status-bar error", "{err}" }
+                    }
+
+                    if content_loading() {
+                        div { class: "status-bar loading", "Loading content items..." }
+                        // Skeleton cards while loading
+                        for _ in 0..3 {
+                            div { class: "pv-content-card panel-surface skeleton-block pv-content-card-skeleton" }
+                        }
+                    } else if content_items().is_empty() && content_error().is_none() {
+                        p { class: "pv-notice pv-content-empty",
+                            "No content items have been pinned to this account yet."
+                        }
+                    } else {
+                        for item in content_items() {
+                            Link {
+                                class: "pv-content-card panel-surface",
+                                to: Route::ItemView {
+                                    encoded_item_id: item.encoded_item_id.clone(),
+                                },
+
+                                if let Some(ref img_url) = item.image_preview_data_url {
+                                    img {
+                                        class: "pv-content-thumb",
+                                        src: img_url.clone(),
+                                        alt: "Content item thumbnail",
+                                    }
+                                }
+
+                                div { class: "pv-content-text",
+                                    div { class: "pv-content-meta",
+                                        span { class: "pv-content-type-pill", "{item.content_type}" }
+                                    }
+                                    if !item.title.trim().is_empty() {
+                                        h4 { class: "pv-content-title", "{item.title}" }
+                                    } else {
+                                        h4 { class: "pv-content-title pv-content-title-untitled", "Untitled item" }
+                                    }
+                                    if !item.description_preview.trim().is_empty() {
+                                        p { class: "pv-content-preview", "{item.description_preview}" }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
