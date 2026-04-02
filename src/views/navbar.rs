@@ -139,6 +139,28 @@ fn AccountSidebar() -> Element {
                 }
             }
 
+            // History navigation — back / forward
+            {
+                let nav = use_navigator();
+                rsx! {
+                    div {
+                        class: "sidebar-history",
+                        button {
+                            class: "sidebar-history-btn",
+                            disabled: !nav.can_go_back(),
+                            onclick: move |_| nav.go_back(),
+                            "←"
+                        }
+                        button {
+                            class: "sidebar-history-btn",
+                            disabled: !nav.can_go_forward(),
+                            onclick: move |_| nav.go_forward(),
+                            "→"
+                        }
+                    }
+                }
+            }
+
             // Account section
             div {
                 class: "sidebar-section",
