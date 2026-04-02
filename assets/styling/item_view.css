@@ -186,6 +186,46 @@
   overflow: hidden;
 }
 
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+
+.iv-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(100, 149, 230, 0.20);
+}
+
+.iv-tab {
+  padding: 9px 22px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: rgba(180, 200, 240, 0.55);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.iv-tab:hover {
+  color: #c5d8ff;
+}
+
+.iv-tab.active {
+  color: #f5f8ff;
+  border-bottom-color: #5a9cf5;
+}
+
+/* ── Edit form panel ──────────────────────────────────────────────────────── */
+
+.iv-edit-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 26px;
+  max-width: 640px;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
