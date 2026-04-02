@@ -3,11 +3,11 @@ use crate::{
     accounts::AccountStore,
     content::{
         build_image_mixin, bytes32_to_hex, decode_single_mixin, fetch_events_for_item,
-        fetch_ipfs_digest_bytes, fetch_latest_revision_hash, hex_to_bytes32,
+        fetch_ipfs_digest_bytes, fetch_latest_revision_hash, fetch_revision_history, hex_to_bytes32,
         preview_data_url_for_image_mixin, preview_data_url_for_path, upload_ipfs_digest,
         BodyTextMixinMessage, IndexerStoredEvent, ItemMessage, LanguageMixinMessage,
-        MixinPayloadMessage, SelectedImage, TitleMixinMessage, BODY_TEXT_MIXIN_ID, IMAGE_MIXIN_ID,
-        LANGUAGE_MIXIN_ID, TITLE_MIXIN_ID, DEFAULT_LANGUAGE_TAG,
+        MixinPayloadMessage, RevisionEntry, SelectedImage, TitleMixinMessage, BODY_TEXT_MIXIN_ID,
+        IMAGE_MIXIN_ID, LANGUAGE_MIXIN_ID, TITLE_MIXIN_ID, DEFAULT_LANGUAGE_TAG,
     },
     feed::FEED_TYPE_MIXIN_ID,
     profile::PROFILE_MIXIN_ID,
@@ -138,7 +138,18 @@ struct ItemDraft {
     body: String,
 }
 
-async fn load_item(encoded_item_id: &str) -> Result<LoadedItem, String> {
+/// Loads an item, optionally loading a specific revision by its IPFS hash.
+///
+/// When `ipfs_hash_override` is `None` the function fetches the full revision
+/// history from the indexer and uses the on-chain `Content.ItemState`
+/// `revision_id` to select the canonical latest revision.  Pass a specific
+/// `ipfs_hash_hex` to display an older revision instead.
+///
+/// Returns `(LoadedItem, revision_history, chain_latest_revision_id)`.
+async fn load_item(
+    encoded_item_id: &str,
+    ipfs_hash_override: Option<String>,
+) -> Result<(LoadedItem, Vec<RevisionEntry>, u32), String> {
     let item_id_bytes = bs58::decode(encoded_item_id)
         .into_vec()
         .map_err(|error| format!("Invalid item ID encoding: {error}"))?;
@@ -155,7 +166,35 @@ async fn load_item(encoded_item_id: &str) -> Result<LoadedItem, String> {
         .map_err(|_| "Failed to convert item ID bytes.".to_string())?;
 
     let item_id_hex = bytes32_to_hex(&item_id);
-    let revision_ipfs_hash = fetch_latest_revision_hash(item_id_hex.clone()).await?;
+
+    // Fetch revision history and on-chain state concurrently.
+    let (history_result, state_result) = tokio::join!(
+        fetch_revision_history(item_id_hex.clone()),
+        fetch_item_state(item_id),
+    );
+
+    let history = history_result?;
+    let (owner_address, chain_latest_revision_id) = state_result.unwrap_or_default();
+
+    // Resolve which IPFS hash and revision_id to display.
+    let (revision_ipfs_hash, loaded_revision_id) = if let Some(hash) = ipfs_hash_override {
+        // Find the matching revision_id in history for metadata; fall back to 0.
+        let rid = history
+            .iter()
+            .find(|e| e.ipfs_hash_hex == hash)
+            .map(|e| e.revision_id)
+            .unwrap_or(0);
+        (hash, rid)
+    } else {
+        // Use the chain-confirmed latest revision.
+        let entry = history
+            .iter()
+            .find(|e| e.revision_id == chain_latest_revision_id)
+            .or_else(|| history.first())
+            .ok_or_else(|| "No revisions found for this item.".to_string())?;
+        (entry.ipfs_hash_hex.clone(), entry.revision_id)
+    };
+
     let item_bytes = fetch_ipfs_digest_bytes(&revision_ipfs_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode item payload: {error}"))?;
@@ -189,24 +228,25 @@ async fn load_item(encoded_item_id: &str) -> Result<LoadedItem, String> {
     // Load parent summaries from the item's own PublishItem indexer event.
     let parents = load_parent_summaries(&item_id_hex).await.unwrap_or_default();
 
-    // ── Query item owner + revision_id from on-chain Content.ItemState ────
-    let (owner_address, revision_id) = fetch_item_state(item_id).await.unwrap_or_default();
-
-    Ok(LoadedItem {
-        encoded_item_id: encoded_item_id.to_string(),
-        item_id,
-        item_id_hex,
-        revision_ipfs_hash_hex: revision_ipfs_hash,
-        content_type,
-        title,
-        body_text,
-        language,
-        image_preview_data_url,
-        existing_image_payload,
-        parents,
-        owner_address,
-        revision_id,
-    })
+    Ok((
+        LoadedItem {
+            encoded_item_id: encoded_item_id.to_string(),
+            item_id,
+            item_id_hex,
+            revision_ipfs_hash_hex: revision_ipfs_hash,
+            content_type,
+            title,
+            body_text,
+            language,
+            image_preview_data_url,
+            existing_image_payload,
+            parents,
+            owner_address,
+            revision_id: loaded_revision_id,
+        },
+        history,
+        chain_latest_revision_id,
+    ))
 }
 
 /// Queries `Content.ItemState` on-chain and returns `(owner_ss58, revision_id)`.
@@ -790,6 +830,16 @@ pub fn ItemView(encoded_item_id: String) -> Element {
     let mut posts_loading = use_signal(|| false);
     let mut posts_error: Signal<Option<String>> = use_signal(|| None);
 
+    // ── Revision history state ──────────────────────────────────────────────
+    // All revisions for this item (newest first) fetched from the indexer.
+    let mut revision_history: Signal<Vec<RevisionEntry>> = use_signal(Vec::new);
+    // The on-chain canonical latest revision_id (from Content.ItemState).
+    let mut chain_latest_revision_id: Signal<u32> = use_signal(|| 0_u32);
+    // IPFS hash of the currently-viewed revision (None = show latest).
+    let mut viewing_ipfs_hash: Signal<Option<String>> = use_signal(|| None);
+    // Whether a switch-revision reload is in progress.
+    let mut revision_switching = use_signal(|| false);
+
     // ── Edit tab state ──────────────────────────────────────────────────────
     let mut active_tab = use_signal(|| ActiveTab::View);
     let mut draft = use_signal(ItemDraft::default);
@@ -806,6 +856,7 @@ pub fn ItemView(encoded_item_id: String) -> Element {
         move || encoded_item_id.clone()
     });
 
+    // Full load: fetch history + latest content, also load feed posts.
     use_effect(move || {
         let id = encoded_id();
         let _tick = reload_tick();
@@ -813,9 +864,11 @@ pub fn ItemView(encoded_item_id: String) -> Element {
             error_message.set(None);
             posts_error.set(None);
             feed_posts.set(Vec::new());
+            revision_history.set(Vec::new());
+            viewing_ipfs_hash.set(None);
             is_loading.set(true);
-            match load_item(&id).await {
-                Ok(item) => {
+            match load_item(&id, None).await {
+                Ok((item, history, chain_latest)) => {
                     let is_feed = item.content_type == "Feed";
                     let item_id_hex = item.item_id_hex.clone();
                     // Pre-populate edit draft from loaded content.
@@ -825,6 +878,8 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                     });
                     selected_image.set(None);
                     active_tab.set(ActiveTab::View);
+                    chain_latest_revision_id.set(chain_latest);
+                    revision_history.set(history);
                     loaded.set(Some(item));
                     is_loading.set(false);
 
@@ -945,6 +1000,38 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                         section {
                             class: "panel-surface item-view-main",
 
+                            // ── Older-revision banner ──────────────────────
+                            if item.revision_id < chain_latest_revision_id() {
+                                div {
+                                    class: "iv-revision-banner",
+                                    span {
+                                        "Viewing revision {item.revision_id} \u{2014} latest is revision {chain_latest_revision_id()}"
+                                    }
+                                    button {
+                                        class: "iv-revision-banner-btn",
+                                        onclick: move |_| {
+                                            let id = encoded_id();
+                                            revision_switching.set(true);
+                                            viewing_ipfs_hash.set(None);
+                                            spawn(async move {
+                                                match load_item(&id, None).await {
+                                                    Ok((new_item, new_history, chain_latest)) => {
+                                                        chain_latest_revision_id.set(chain_latest);
+                                                        revision_history.set(new_history);
+                                                        loaded.set(Some(new_item));
+                                                    }
+                                                    Err(err) => {
+                                                        error_message.set(Some(err));
+                                                    }
+                                                }
+                                                revision_switching.set(false);
+                                            });
+                                        },
+                                        if revision_switching() { "Loading..." } else { "View latest" }
+                                    }
+                                }
+                            }
+
                             // Parent links
                             if !item.parents.is_empty() {
                                 div { class: "iv-parents",
@@ -1012,7 +1099,7 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                                         }
                                     }
                                     div { class: "metadata-row",
-                                        span { class: "meta-label", "Latest revision" }
+                                        span { class: "meta-label", "Revision IPFS hash" }
                                         code { class: "meta-code",
                                             "{short_hex(&item.revision_ipfs_hash_hex)}"
                                         }
@@ -1025,6 +1112,67 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                                         div { class: "metadata-row",
                                             span { class: "meta-label", "Language" }
                                             span { class: "meta-copy", "{item.language}" }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ── Revision selector ─────────────────────────
+                            if revision_history().len() > 1 {
+                                div { class: "pv-meta-section",
+                                    p { class: "pv-section-label", "Revisions" }
+                                    select {
+                                        class: "iv-revision-select",
+                                        disabled: revision_switching(),
+                                        value: item.revision_id.to_string(),
+                                        onchange: move |e| {
+                                            // The selected value is the revision_id as a string.
+                                            let selected_rid: u32 = e.value().parse().unwrap_or(0);
+                                            let history = revision_history();
+                                            let Some(entry) = history
+                                                .iter()
+                                                .find(|r| r.revision_id == selected_rid)
+                                            else {
+                                                return;
+                                            };
+                                            let hash = entry.ipfs_hash_hex.clone();
+                                            let is_latest = selected_rid == chain_latest_revision_id();
+                                            let override_hash = if is_latest { None } else { Some(hash.clone()) };
+                                            let id = encoded_id();
+                                            revision_switching.set(true);
+                                            viewing_ipfs_hash.set(override_hash.clone());
+                                            spawn(async move {
+                                                match load_item(&id, override_hash).await {
+                                                    Ok((new_item, new_history, chain_latest)) => {
+                                                        chain_latest_revision_id.set(chain_latest);
+                                                        revision_history.set(new_history);
+                                                        loaded.set(Some(new_item));
+                                                    }
+                                                    Err(err) => {
+                                                        error_message.set(Some(err));
+                                                    }
+                                                }
+                                                revision_switching.set(false);
+                                            });
+                                        },
+                                        for rev in revision_history() {
+                                            {
+                                                let is_latest = rev.revision_id == chain_latest_revision_id();
+                                                let label = if is_latest {
+                                                    format!("Revision {} (latest)", rev.revision_id)
+                                                } else {
+                                                    format!("Revision {}", rev.revision_id)
+                                                };
+                                                let rid_str = rev.revision_id.to_string();
+                                                let selected = rev.revision_id == item.revision_id;
+                                                rsx! {
+                                                    option {
+                                                        value: rid_str,
+                                                        selected,
+                                                        "{label}"
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

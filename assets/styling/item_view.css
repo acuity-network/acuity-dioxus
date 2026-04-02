@@ -339,6 +339,71 @@
   color: rgba(180, 200, 240, 0.50);
 }
 
+/* ── Revision history ────────────────────────────────────────────────────── */
+
+.iv-revision-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(200, 140, 30, 0.14);
+  border: 1px solid rgba(220, 160, 40, 0.30);
+  font-size: 0.88rem;
+  color: rgba(255, 215, 120, 0.90);
+}
+
+.iv-revision-banner span {
+  flex: 1;
+}
+
+.iv-revision-banner-btn {
+  padding: 4px 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(220, 160, 40, 0.40);
+  background: rgba(200, 140, 30, 0.22);
+  color: rgba(255, 215, 120, 0.95);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.iv-revision-banner-btn:hover:not(:disabled) {
+  background: rgba(220, 160, 40, 0.32);
+  border-color: rgba(240, 180, 60, 0.55);
+}
+
+.iv-revision-banner-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.iv-revision-select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 149, 230, 0.28);
+  background: rgba(20, 30, 60, 0.55);
+  color: #d8e8ff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  appearance: auto;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.iv-revision-select:focus {
+  border-color: rgba(120, 165, 240, 0.55);
+  background: rgba(30, 45, 90, 0.65);
+}
+
+.iv-revision-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {

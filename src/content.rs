@@ -92,6 +92,18 @@ pub struct BuiltImageMixin {
     pub preview_data_url: String,
 }
 
+// ── Revision types ────────────────────────────────────────────────────────────
+
+/// A single revision entry for an item, resolved from an indexed
+/// `Content::PublishRevision` event.
+#[derive(Clone, PartialEq)]
+pub struct RevisionEntry {
+    /// On-chain revision counter (starts at 0, increments per revision).
+    pub revision_id: u32,
+    /// IPFS content hash in `0x`-prefixed hex (sha2-256 digest).
+    pub ipfs_hash_hex: String,
+}
+
 // ── Indexer types ─────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -484,82 +496,69 @@ pub async fn fetch_events_for_item(
 }
 
 pub async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, String> {
-    let (mut stream, _) = connect_async(INDEXER_URL)
-        .await
-        .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
+    let history = fetch_revision_history(item_id_hex).await?;
+    history
+        .into_iter()
+        .next()
+        .map(|entry| entry.ipfs_hash_hex)
+        .ok_or_else(|| {
+            "No indexed Content::PublishRevision event was found for this item.".to_string()
+        })
+}
 
-    let request = IndexerEventsRequest {
-        message_type: "GetEvents",
-        key: IndexerKey::Custom(IndexerCustomKey {
-            name: "item_id",
-            kind: "bytes32",
-            value: item_id_hex,
-        }),
-    };
+/// Fetches the full revision history for an item from the indexer, returning
+/// all `Content::PublishRevision` events sorted by `revision_id` **descending**
+/// (newest first).
+pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionEntry>, String> {
+    let decoded_events = fetch_events_for_item(item_id_hex).await?;
 
-    stream
-        .send(WsMessage::Text(
-            serde_json::to_string(&request)
-                .map_err(|error| format!("Failed to encode indexer request: {error}"))?
-                .into(),
-        ))
-        .await
-        .map_err(|error| format!("Failed to query the indexer: {error}"))?;
-
-    while let Some(message) = stream.next().await {
-        let message =
-            message.map_err(|error| format!("Failed to read indexer response: {error}"))?;
-
-        let payload = match message {
-            WsMessage::Text(text) => text.to_string(),
-            WsMessage::Binary(bytes) => std::str::from_utf8(&bytes)
-                .map_err(|error| format!("Indexer returned invalid UTF-8: {error}"))?
-                .to_string(),
-            WsMessage::Close(_) => break,
-            WsMessage::Ping(_) | WsMessage::Pong(_) | WsMessage::Frame(_) => continue,
-        };
-
-        let envelope = serde_json::from_str::<IndexerEnvelope>(&payload)
-            .map_err(|error| format!("Failed to decode indexer event response: {error}"))?;
-
-        if envelope.message_type != "events" {
-            continue;
-        }
-
-        let response = envelope
-            .data
-            .ok_or_else(|| "Indexer events response did not include any event data.".to_string())?;
-        if response.decoded_events.is_empty() {
-            return Err(
-                "The indexer did not return stored events. Enable event storage in the indexer so the dapp can resolve revisions."
-                    .to_string(),
-            );
-        }
-
-        for decoded_event in response.decoded_events {
-            let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event)
-                .map_err(|error| format!("Failed to decode indexed event payload: {error}"))?;
-            if event.pallet_name != "Content" || event.event_name != "PublishRevision" {
-                continue;
-            }
-
-            let ipfs_hash = event
-                .fields
-                .get("ipfs_hash")
-                .and_then(|value| value.as_str())
-                .ok_or_else(|| {
-                    "Latest revision was missing an ipfs_hash field.".to_string()
-                })?;
-            return Ok(ipfs_hash.to_string());
-        }
-
+    if decoded_events.is_empty() {
         return Err(
-            "No indexed Content::PublishRevision event was found for this item."
+            "The indexer did not return stored events. Enable event storage in the indexer so the dapp can resolve revisions."
                 .to_string(),
         );
     }
 
-    Err("The indexer closed the websocket before returning events.".to_string())
+    let mut entries: Vec<RevisionEntry> = Vec::new();
+
+    for decoded_event in decoded_events {
+        let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event)
+            .map_err(|error| format!("Failed to decode indexed event payload: {error}"))?;
+
+        if event.pallet_name != "Content" || event.event_name != "PublishRevision" {
+            continue;
+        }
+
+        let ipfs_hash_hex = event
+            .fields
+            .get("ipfs_hash")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| "PublishRevision event was missing an ipfs_hash field.".to_string())?
+            .to_string();
+
+        let revision_id = event
+            .fields
+            .get("revision_id")
+            .and_then(|value| value.as_u64())
+            .ok_or_else(|| "PublishRevision event was missing a revision_id field.".to_string())?
+            as u32;
+
+        entries.push(RevisionEntry {
+            revision_id,
+            ipfs_hash_hex,
+        });
+    }
+
+    if entries.is_empty() {
+        return Err(
+            "No indexed Content::PublishRevision event was found for this item.".to_string(),
+        );
+    }
+
+    // Sort newest first.
+    entries.sort_by(|a, b| b.revision_id.cmp(&a.revision_id));
+
+    Ok(entries)
 }
 
 #[cfg(test)]
