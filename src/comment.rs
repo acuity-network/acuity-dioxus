@@ -5,9 +5,10 @@ use rand::RngCore;
 use crate::accounts::AccountStore;
 use crate::content::{
     account_id_from_ss58, bytes32_to_hex, decode_single_mixin, derive_item_id,
-    fetch_events_for_item, fetch_ipfs_digest_bytes, fetch_latest_revision_hash, hex_to_bytes32,
-    BodyTextMixinMessage, IndexerStoredEvent, ItemMessage, LanguageMixinMessage,
-    MixinPayloadMessage, BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, LANGUAGE_MIXIN_ID,
+    fetch_events_for_item, fetch_ipfs_digest_bytes, fetch_latest_revision_hash,
+    fetch_revision_history, hex_to_bytes32, upload_ipfs_digest, BodyTextMixinMessage,
+    IndexerStoredEvent, ItemMessage, LanguageMixinMessage, MixinPayloadMessage,
+    RevisionEntry, BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, LANGUAGE_MIXIN_ID,
 };
 
 /// Mixin ID that marks a content item as a comment. Matches the original
@@ -46,6 +47,10 @@ pub struct LoadedComment {
     pub body_text: String,
     /// SS58 address of the account that published this comment.
     pub owner_address: String,
+    /// Current on-chain revision counter from `Content.ItemState`.
+    pub revision_id: u32,
+    /// Whether the comment's `flags & 0x01` bit is set (revisionable).
+    pub is_revisionable: bool,
     /// Recursively-loaded child comments on this comment.
     pub children: Vec<LoadedComment>,
 }
@@ -257,10 +262,9 @@ fn load_single_comment(
             .map(|m| m.body_text)
             .unwrap_or_default();
 
-        // Resolve owner address from on-chain ItemState.
-        let owner_address = fetch_owner_address(&item_id_hex)
-            .await
-            .unwrap_or_default();
+        // Resolve owner address, revision_id, and revisionable flag from on-chain ItemState.
+        let (owner_address, revision_id, is_revisionable) =
+            fetch_comment_state(&item_id_hex).await.unwrap_or_default();
 
         let item_id_bytes = hex_to_bytes32(&item_id_hex)?;
         let encoded_item_id = bs58::encode(item_id_bytes).into_string();
@@ -276,19 +280,24 @@ fn load_single_comment(
             encoded_item_id,
             body_text,
             owner_address,
+            revision_id,
+            is_revisionable,
             children,
         }))
     })
 }
 
-/// Fetch the SS58 owner address for an item from the on-chain `Content.ItemState`.
-async fn fetch_owner_address(item_id_hex: &str) -> Result<String, String> {
+/// Fetch the SS58 owner address, current revision ID, and revisionable flag
+/// for a comment item from the on-chain `Content.ItemState`.
+///
+/// Returns `(owner_address, revision_id, is_revisionable)`.
+async fn fetch_comment_state(item_id_hex: &str) -> Result<(String, u32, bool), String> {
     let item_id_bytes = hex_to_bytes32(item_id_hex)?;
     let client = connect_acuity_client().await?;
     let at_block = client
         .at_current_block()
         .await
-        .map_err(|e| format!("Failed to access block for owner lookup: {e}"))?;
+        .map_err(|e| format!("Failed to access block for comment state lookup: {e}"))?;
 
     let maybe_state = at_block
         .storage()
@@ -297,18 +306,84 @@ async fn fetch_owner_address(item_id_hex: &str) -> Result<String, String> {
             (api::runtime_types::pallet_content::pallet::ItemId(item_id_bytes),),
         )
         .await
-        .map_err(|e| format!("Failed to fetch ItemState: {e}"))?;
+        .map_err(|e| format!("Failed to fetch comment ItemState: {e}"))?;
 
-    let address = maybe_state
+    let result = maybe_state
         .and_then(|encoded| encoded.decode().ok())
         .map(|state| {
             use sp_core::crypto::Ss58Codec;
             let account_id = sp_core::crypto::AccountId32::from(state.owner.0);
-            account_id.to_ss58check()
+            let owner_address = account_id.to_ss58check();
+            let revision_id = state.revision_id;
+            let is_revisionable = state.flags & 0x01 != 0;
+            (owner_address, revision_id, is_revisionable)
         })
         .unwrap_or_default();
 
-    Ok(address)
+    Ok(result)
+}
+
+// ── Revision ──────────────────────────────────────────────────────────────────
+
+/// Load the full revision history for a comment item from the indexer.
+///
+/// This is a thin wrapper around `fetch_revision_history` from `content.rs`,
+/// exposed here so that `CommentCard` can request it without importing
+/// lower-level content helpers directly.
+pub async fn load_comment_revision_history(
+    item_id_hex: String,
+) -> Result<Vec<RevisionEntry>, String> {
+    fetch_revision_history(item_id_hex).await
+}
+
+/// Publish an edited revision of an existing comment.
+///
+/// Encodes a new IPFS payload with the updated `draft.body`, uploads it, and
+/// submits `content.publish_revision(item_id, [], [], ipfs_hash)`.
+pub async fn publish_comment_revision(
+    account_store: &AccountStore,
+    comment_item_id: [u8; 32],
+    draft: CommentDraft,
+) -> Result<(), String> {
+    // ── 1. Validate account ────────────────────────────────────────────────
+    let signer = account_store
+        .active_account_id
+        .as_deref()
+        .and_then(|id| account_store.unlocked_signers.get(id))
+        .cloned()
+        .ok_or_else(|| "Unlock the active account before editing a comment.".to_string())?;
+
+    // ── 2. Encode protobuf payload ─────────────────────────────────────────
+    let item_payload = encode_comment_item(&draft);
+
+    // ── 3. Upload to IPFS ──────────────────────────────────────────────────
+    let revision_ipfs_hash = upload_ipfs_digest(&item_payload).await?;
+    let revision_ipfs_hash_bytes = hex_to_bytes32(&revision_ipfs_hash)?;
+
+    // ── 4. Submit content.publish_revision ────────────────────────────────
+    let client = connect_acuity_client().await?;
+    let at_block = client
+        .at_current_block()
+        .await
+        .map_err(|e| format!("Failed to access latest block for comment revision: {e}"))?;
+
+    let publish_revision_tx = api::tx().content().publish_revision(
+        api::runtime_types::pallet_content::pallet::ItemId(comment_item_id),
+        api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+        api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+        api::runtime_types::pallet_content::pallet::IpfsHash(revision_ipfs_hash_bytes),
+    );
+
+    at_block
+        .tx()
+        .sign_and_submit_then_watch_default(&publish_revision_tx, &signer)
+        .await
+        .map_err(|e| format!("Failed to submit comment revision transaction: {e}"))?
+        .wait_for_finalized_success()
+        .await
+        .map_err(|e| format!("Comment revision transaction failed: {e}"))?;
+
+    Ok(())
 }
 
 #[cfg(test)]

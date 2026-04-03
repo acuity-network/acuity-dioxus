@@ -536,6 +536,90 @@
   border-top: 1px solid rgba(100, 149, 230, 0.12);
 }
 
+/* ── Comment revision selector ───────────────────────────────────────────── */
+
+.comment-revisions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.comment-revision-select {
+  padding: 2px 24px 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 149, 230, 0.28);
+  background: rgba(20, 30, 60, 0.55);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a0b4d8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: rgba(160, 195, 255, 0.80);
+  font-size: 0.80rem;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.comment-revision-select:hover {
+  border-color: rgba(120, 165, 240, 0.45);
+  background-color: rgba(30, 45, 90, 0.60);
+}
+
+.comment-revision-select:focus {
+  border-color: rgba(120, 165, 240, 0.55);
+}
+
+.comment-revision-select:disabled {
+  opacity: 0.50;
+  cursor: not-allowed;
+}
+
+.comment-revision-select option {
+  background: #0d1220;
+  color: #f8fbff;
+}
+
+/* ── Comment edit button ─────────────────────────────────────────────────── */
+
+.comment-edit-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 149, 230, 0.28);
+  background: transparent;
+  color: rgba(160, 195, 255, 0.70);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.comment-edit-btn:hover {
+  background: rgba(60, 100, 190, 0.18);
+  border-color: rgba(120, 165, 240, 0.45);
+  color: #c5d8ff;
+}
+
+/* ── Inline comment edit form ────────────────────────────────────────────── */
+
+.comment-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(100, 149, 230, 0.12);
+}
+
+.comment-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
