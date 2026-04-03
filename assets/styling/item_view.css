@@ -382,16 +382,21 @@
 
 .iv-revision-select {
   width: 100%;
-  padding: 7px 10px;
+  padding: 7px 32px 7px 10px;
   border-radius: 8px;
   border: 1px solid rgba(100, 149, 230, 0.28);
   background: rgba(20, 30, 60, 0.55);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a0b4d8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   color: #d8e8ff;
   font-size: 0.9rem;
   cursor: pointer;
-  appearance: auto;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   outline: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .iv-revision-select:focus {
@@ -405,8 +410,8 @@
 }
 
 .iv-revision-select option {
-  background: #141e3c;
-  color: #d8e8ff;
+  background: #0d1220;
+  color: #f8fbff;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
