@@ -404,6 +404,11 @@
   cursor: not-allowed;
 }
 
+.iv-revision-select option {
+  background: #141e3c;
+  color: #d8e8ff;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
