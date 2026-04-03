@@ -571,7 +571,7 @@ async fn load_single_post(item_id_hex: &str) -> Result<FeedPost, String> {
 // ── Reactions component ───────────────────────────────────────────────────────
 
 #[component]
-fn Reactions(item_id: [u8; 32], revision_id: u32) -> Element {
+fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
 
     let mut reactions: Signal<Vec<ReactionSummary>> = use_signal(Vec::new);
@@ -585,6 +585,7 @@ fn Reactions(item_id: [u8; 32], revision_id: u32) -> Element {
     // Load reactions whenever item_id, revision_id, or reload_tick changes.
     use_effect(move || {
         let _tick = reload_tick();
+        let revision_id = revision_id();
         let active_address = account_store()
             .active_account()
             .map(|a| a.address.clone());
@@ -613,6 +614,7 @@ fn Reactions(item_id: [u8; 32], revision_id: u32) -> Element {
             ));
             return;
         };
+        let revision_id = revision_id();
 
         spawn(async move {
             is_submitting.set(true);
@@ -674,6 +676,16 @@ fn Reactions(item_id: [u8; 32], revision_id: u32) -> Element {
         });
     };
 
+    // Whether the active account is unlocked (has a signer available).
+    let is_unlocked = {
+        let store = account_store();
+        store
+            .active_account_id
+            .as_deref()
+            .map(|id| store.unlocked_signers.contains_key(id))
+            .unwrap_or(false)
+    };
+
     // Which emoji the active account has already reacted with.
     let reacted_codepoints: Vec<u32> = reactions()
         .iter()
@@ -722,8 +734,8 @@ fn Reactions(item_id: [u8; 32], revision_id: u32) -> Element {
                     }
                 }
 
-                // "+" button to open/close the picker
-                if !picker_emojis.is_empty() {
+                // "+" button to open/close the picker — only when unlocked
+                if is_unlocked && !picker_emojis.is_empty() {
                     button {
                         class: "reaction-add",
                         disabled: is_submitting(),
@@ -1022,6 +1034,12 @@ fn CommentCard(
                         }
                     }
                 }
+            }
+
+            // ── Reactions ─────────────────────────────────────────────────────
+            Reactions {
+                item_id: comment_item_id,
+                revision_id: selected_revision_id(),
             }
 
             // ── Action buttons (Reply / Edit) ─────────────────────────────────
