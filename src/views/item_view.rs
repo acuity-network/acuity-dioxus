@@ -818,7 +818,7 @@ fn encode_revised_item(
 }
 
 #[component]
-pub fn ItemView(encoded_item_id: String) -> Element {
+pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
 
     let mut loaded: Signal<Option<LoadedItem>> = use_signal(|| None);
@@ -851,14 +851,9 @@ pub fn ItemView(encoded_item_id: String) -> Element {
     // Incrementing this signal re-triggers the load effect after a save.
     let mut reload_tick = use_signal(|| 0_u64);
 
-    let encoded_id = use_memo({
-        let encoded_item_id = encoded_item_id.clone();
-        move || encoded_item_id.clone()
-    });
-
     // Full load: fetch history + latest content, also load feed posts.
     use_effect(move || {
-        let id = encoded_id();
+        let id = encoded_item_id();
         let _tick = reload_tick();
         spawn(async move {
             error_message.set(None);
@@ -1010,7 +1005,7 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                                     button {
                                         class: "iv-revision-banner-btn",
                                         onclick: move |_| {
-                                            let id = encoded_id();
+                                            let id = encoded_item_id();
                                             revision_switching.set(true);
                                             viewing_ipfs_hash.set(None);
                                             spawn(async move {
@@ -1138,7 +1133,7 @@ pub fn ItemView(encoded_item_id: String) -> Element {
                                             let hash = entry.ipfs_hash_hex.clone();
                                             let is_latest = selected_rid == chain_latest_revision_id();
                                             let override_hash = if is_latest { None } else { Some(hash.clone()) };
-                                            let id = encoded_id();
+                                            let id = encoded_item_id();
                                             revision_switching.set(true);
                                             viewing_ipfs_hash.set(override_hash.clone());
                                             spawn(async move {
