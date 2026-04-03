@@ -4,6 +4,7 @@ Provide concise code examples with detailed descriptions
 
 ## Repo Notes
 
+- Read `ARCHITECTURE.md` before planning or making changes — it describes the module structure, routing, service connections, content protocol, and key dependencies. Update it whenever structural changes are made (new routes, new modules, new pallets, changed service URLs, changed mixin IDs).
 - `acuity-dioxus` is currently desktop-only by default.
 - Treat it as an Acuity dapp that should maintain a persistent Subxt websocket connection to `ws://127.0.0.1:9944`.
 - Keep the current block number visible globally in the shared layout so it appears across routes.
