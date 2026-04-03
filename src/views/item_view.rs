@@ -1,6 +1,7 @@
 use crate::{
     acuity_runtime::api,
     accounts::AccountStore,
+    comment::{load_comments_for_item, publish_comment, CommentDraft, LoadedComment, PublishCommentRequest},
     content::{
         build_image_mixin, bytes32_to_hex, decode_single_mixin, fetch_events_for_item,
         fetch_ipfs_digest_bytes, fetch_latest_revision_hash, fetch_revision_history, hex_to_bytes32,
@@ -817,6 +818,119 @@ fn encode_revised_item(
     .encode_to_vec()
 }
 
+// ── Comment components ────────────────────────────────────────────────────────
+
+/// Recursive component that renders one comment and all its nested children.
+#[component]
+fn CommentCard(
+    comment: LoadedComment,
+    /// Nesting depth — used to indent nested replies.
+    depth: u32,
+    /// Incrementing this tick from the parent causes a comment reload.
+    mut reload_tick: Signal<u64>,
+    account_store: Signal<AccountStore>,
+) -> Element {
+    let mut reply_open = use_signal(|| false);
+    let mut reply_body: Signal<String> = use_signal(String::new);
+    let mut is_submitting = use_signal(|| false);
+    let mut submit_error: Signal<Option<String>> = use_signal(|| None);
+
+    let parent_item_id = comment.item_id;
+    let indent_px = depth * 20;
+    let short_address = {
+        let addr = &comment.owner_address;
+        if addr.len() > 16 {
+            format!("{}…{}", &addr[..8], &addr[addr.len() - 6..])
+        } else {
+            addr.clone()
+        }
+    };
+
+    let submit_reply = {
+        move |_| {
+            let body = reply_body();
+            if body.trim().is_empty() {
+                return;
+            }
+            let store = account_store();
+            spawn(async move {
+                submit_error.set(None);
+                is_submitting.set(true);
+                let req = PublishCommentRequest {
+                    draft: CommentDraft { body },
+                    parent_item_id,
+                };
+                match publish_comment(&store, req).await {
+                    Ok(_) => {
+                        reply_body.set(String::new());
+                        reply_open.set(false);
+                        reload_tick.with_mut(|t| *t += 1);
+                    }
+                    Err(e) => submit_error.set(Some(e)),
+                }
+                is_submitting.set(false);
+            });
+        }
+    };
+
+    rsx! {
+        div {
+            class: "comment-card",
+            style: "margin-left: {indent_px}px;",
+
+            div { class: "comment-header",
+                span { class: "comment-author", title: "{comment.owner_address}", "{short_address}" }
+            }
+
+            p { class: "comment-body", "{comment.body_text}" }
+
+            // Reply toggle button
+            div { class: "comment-actions",
+                button {
+                    class: "comment-reply-btn",
+                    onclick: move |_| reply_open.with_mut(|v| *v = !*v),
+                    if reply_open() { "Cancel" } else { "Reply" }
+                }
+            }
+
+            // Inline reply form
+            if reply_open() {
+                div { class: "comment-reply-form",
+                    if let Some(err) = submit_error() {
+                        div { class: "status-bar error", "{err}" }
+                    }
+                    textarea {
+                        class: "comment-textarea",
+                        rows: "3",
+                        placeholder: "Write a reply…",
+                        disabled: is_submitting(),
+                        value: reply_body(),
+                        oninput: move |e| reply_body.set(e.value()),
+                    }
+                    div { class: "comment-reply-actions",
+                        button {
+                            class: "btn-primary",
+                            disabled: is_submitting() || reply_body().trim().is_empty(),
+                            onclick: submit_reply,
+                            if is_submitting() { "Posting…" } else { "Post reply" }
+                        }
+                    }
+                }
+            }
+
+            // Nested children
+            for child in comment.children.clone() {
+                CommentCard {
+                    comment: child,
+                    depth: depth + 1,
+                    reload_tick,
+                    account_store,
+                }
+            }
+        }
+    }
+}
+
 #[component]
 pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
@@ -851,14 +965,24 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     // Incrementing this signal re-triggers the load effect after a save.
     let mut reload_tick = use_signal(|| 0_u64);
 
-    // Full load: fetch history + latest content, also load feed posts.
+    // ── Comment state ───────────────────────────────────────────────────────
+    let mut comments: Signal<Vec<LoadedComment>> = use_signal(Vec::new);
+    let mut comments_loading = use_signal(|| false);
+    let mut comments_error: Signal<Option<String>> = use_signal(|| None);
+    let mut top_level_reply_body: Signal<String> = use_signal(String::new);
+    let mut top_level_submitting = use_signal(|| false);
+    let mut top_level_submit_error: Signal<Option<String>> = use_signal(|| None);
+
+    // Full load: fetch history + latest content, also load feed posts and comments.
     use_effect(move || {
         let id = encoded_item_id();
         let _tick = reload_tick();
         spawn(async move {
             error_message.set(None);
             posts_error.set(None);
+            comments_error.set(None);
             feed_posts.set(Vec::new());
+            comments.set(Vec::new());
             revision_history.set(Vec::new());
             viewing_ipfs_hash.set(None);
             is_loading.set(true);
@@ -878,7 +1002,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                     loaded.set(Some(item));
                     is_loading.set(false);
 
-                    // If this is a feed, load its child posts
+                    // If this is a feed, load its child posts.
                     if is_feed {
                         posts_loading.set(true);
                         match load_feed_posts(&item_id_hex).await {
@@ -887,6 +1011,14 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                         }
                         posts_loading.set(false);
                     }
+
+                    // Load comments for all item types.
+                    comments_loading.set(true);
+                    match load_comments_for_item(item_id_hex.clone()).await {
+                        Ok(c) => comments.set(c),
+                        Err(err) => comments_error.set(Some(err)),
+                    }
+                    comments_loading.set(false);
                 }
                 Err(err) => {
                     loaded.set(None);
@@ -907,6 +1039,35 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
             .map(|a| a.address == item.owner_address)
             .unwrap_or(false)
     });
+
+    // Top-level comment submit handler (reply to the item itself).
+    let submit_top_level_comment = {
+        move |_| {
+            let body = top_level_reply_body();
+            if body.trim().is_empty() {
+                return;
+            }
+            let store = account_store();
+            let Some(item) = loaded() else { return };
+            let parent_item_id = item.item_id;
+            spawn(async move {
+                top_level_submit_error.set(None);
+                top_level_submitting.set(true);
+                let req = PublishCommentRequest {
+                    draft: CommentDraft { body },
+                    parent_item_id,
+                };
+                match publish_comment(&store, req).await {
+                    Ok(_) => {
+                        top_level_reply_body.set(String::new());
+                        reload_tick.with_mut(|t| *t += 1);
+                    }
+                    Err(e) => top_level_submit_error.set(Some(e)),
+                }
+                top_level_submitting.set(false);
+            });
+        }
+    };
 
     // Edit status bar: error > saving > notice
     let edit_status: Option<(&'static str, String)> = if let Some(ref err) = save_error() {
@@ -1231,6 +1392,64 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // ── Comments section ───────────────────────────────────
+                    section {
+                        class: "iv-comments-section",
+
+                        h3 { class: "iv-comments-heading", "Comments" }
+
+                        // Top-level reply form
+                        div { class: "iv-top-comment-form",
+                            if let Some(err) = top_level_submit_error() {
+                                div { class: "status-bar error", "{err}" }
+                            }
+                            textarea {
+                                class: "comment-textarea",
+                                rows: "3",
+                                placeholder: if account_store().is_active_unlocked() {
+                                    "Leave a comment…"
+                                } else {
+                                    "Unlock your account to leave a comment."
+                                },
+                                disabled: top_level_submitting() || !account_store().is_active_unlocked(),
+                                value: top_level_reply_body(),
+                                oninput: move |e| top_level_reply_body.set(e.value()),
+                            }
+                            if account_store().is_active_unlocked() {
+                                div { class: "comment-reply-actions",
+                                    button {
+                                        class: "btn-primary",
+                                        disabled: top_level_submitting() || top_level_reply_body().trim().is_empty(),
+                                        onclick: submit_top_level_comment,
+                                        if top_level_submitting() { "Posting…" } else { "Post comment" }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Comment thread
+                        if comments_loading() {
+                            div { class: "status-bar loading", "Loading comments..." }
+                        }
+
+                        if let Some(err) = comments_error() {
+                            div { class: "status-bar error", "{err}" }
+                        }
+
+                        if !comments_loading() && comments().is_empty() && comments_error().is_none() {
+                            p { class: "pv-notice", "No comments yet. Be the first!" }
+                        }
+
+                        for comment in comments() {
+                            CommentCard {
+                                comment,
+                                depth: 0,
+                                reload_tick,
+                                account_store,
                             }
                         }
                     }
