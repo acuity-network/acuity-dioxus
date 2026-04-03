@@ -1,6 +1,8 @@
 mod chain_status;
 pub use chain_status::ChainStatus;
 
+pub mod components;
+
 mod home;
 pub use home::Home;
 

@@ -66,13 +66,14 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `src/main.rs` | Entry point, `Route` enum, `App` component, global context providers, three connection-watcher loops |
 | `src/runtime_client.rs` | `type AcuityClient = OnlineClient<PolkadotConfig>` and `connect()` targeting `ws://127.0.0.1:9944` |
 | `src/acuity_runtime.rs` | **Auto-generated** (~9 900 lines). Typed Subxt bindings for the Acuity Substrate runtime. Regenerate with `just generate-runtime-api`. Do not edit manually. |
-| `src/content.rs` | Protobuf message types, mixin ID constants, IPFS upload/download helpers, item ID derivation, indexer event queries, CID↔hex conversion utilities |
+| `src/content.rs` | Protobuf message types, mixin ID constants, IPFS upload/download helpers, item ID derivation, indexer event queries, CID↔hex conversion utilities, `short_hex` display helper |
 | `src/accounts.rs` | Local keystore: sr25519 keypair generation, Polkadot-JS–compatible scrypt + XSalsa20-Poly1305 encryption, `AccountStore` CRUD |
 | `src/profile.rs` | Load profile (indexer + IPFS) and save profile (encode protobuf, upload to IPFS, submit batched extrinsics) |
 | `src/feed.rs` | Publish feeds (`publish_item` + `account_content::add_item`), resolve feed item summaries, list account pinned content |
 | `src/post.rs` | Publish posts (single `content.publish_item` with parent feed reference) |
+| `src/item.rs` | `publish_item_revision` — encode revised item payload, upload to IPFS, submit `content::publish_revision` extrinsic; `encode_revised_item` builder |
 | `src/comment.rs` | Publish, revise, and recursively load comment trees; detects `COMMENT_TYPE_MIXIN_ID` |
-| `src/views/` | 11 Dioxus UI components (see Views section below) |
+| `src/views/` | Dioxus UI components (see Views section below) |
 
 ---
 
@@ -88,11 +89,15 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `ChainStatus` | `chain_status.rs` | Displays block numbers, genesis hash, runtime constants |
 | `IndexerStatus` | `indexer_status.rs` | Indexed block spans table, connection status, coverage stats |
 | `IpfsStatus` | `ipfs_status.rs` | IPFS peer ID, public key, multiaddresses, protocols |
-| `ProfileView` | `profile.rs` | Read-only profile: avatar, name, type pill, location, bio, pinned content cards |
-| `ProfileEdit` | `profile.rs` | Edit form with drag-and-drop image upload; saves via batched extrinsics |
+| `ProfileView` | `profile/view.rs` | Read-only profile: avatar, name, type pill, location, bio, pinned content cards |
+| `ProfileEdit` | `profile/edit.rs` | Edit form with drag-and-drop image upload; saves via batched extrinsics |
 | `PublishFeed` | `publish_feed.rs` | Create a new Feed item (title + description + optional image) |
 | `PublishPost` | `publish_post.rs` | Create a Post inside a Feed (title + body + optional image) |
-| `ItemView` | `item_view.rs` | Full item viewer: revision history selector, owner Edit tab, emoji reactions, feed child posts, recursive `CommentCard` tree |
+| `ItemView` | `item_view/mod.rs` | Full item viewer: revision history selector, owner Edit tab, emoji reactions, feed child posts, recursive `CommentCard` tree |
+| `Reactions` | `item_view/reactions.rs` | Emoji reaction chips with picker; submits `add_reaction`/`remove_reaction` extrinsics |
+| `CommentCard` | `item_view/comment_card.rs` | Recursive comment card: body, revision selector, reactions, inline reply/edit forms, nested children |
+| `ImageDropZone` | `components.rs` | Shared drag-and-drop / click-to-pick image zone; used by `ProfileEdit`, `PublishFeed`, `PublishPost`, and `ItemView` edit tab |
+| `EmptyState` | `components.rs` | Shared centred empty/not-found card with optional CTA link; used by `ProfileView`, `ItemView`, `PublishPost`, `PublishFeed` |
 
 ---
 

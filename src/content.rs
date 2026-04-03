@@ -10,6 +10,17 @@ use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 
+// ── Formatting utilities ──────────────────────────────────────────────────────
+
+/// Abbreviates a long hex string to `first10...last8` for display.
+pub fn short_hex(value: &str) -> String {
+    if value.len() <= 18 {
+        value.to_string()
+    } else {
+        format!("{}...{}", &value[..10], &value[value.len() - 8..])
+    }
+}
+
 // ── Mixin ID constants ────────────────────────────────────────────────────────
 
 pub const LANGUAGE_MIXIN_ID: u32 = 0x9bc7_a0e6;

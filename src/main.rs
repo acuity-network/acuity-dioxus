@@ -215,6 +215,7 @@ mod acuity_runtime;
 mod comment;
 mod content;
 mod feed;
+mod item;
 mod post;
 mod profile;
 mod runtime_client;

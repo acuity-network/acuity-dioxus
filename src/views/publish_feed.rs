@@ -1,12 +1,12 @@
 use crate::{
     accounts::AccountStore,
-    content::{preview_data_url_for_path, SelectedImage},
+    content::SelectedImage,
     feed::{publish_feed, FeedDraft, PublishFeedRequest},
     Route,
 };
-use dioxus::html::HasFileData;
 use dioxus::prelude::*;
-use rfd::FileDialog;
+
+use super::components::{EmptyState, ImageDropZone};
 
 const PUBLISH_FEED_CSS: Asset = asset!("/assets/styling/publish_feed.css");
 const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
@@ -20,18 +20,14 @@ pub fn PublishFeed() -> Element {
     let is_unlocked = account_snapshot.is_active_unlocked();
 
     let mut draft = use_signal(FeedDraft::default);
-    let mut selected_image = use_signal(|| None::<SelectedImage>);
+    let selected_image = use_signal(|| None::<SelectedImage>);
 
     let mut is_saving = use_signal(|| false);
     let mut error_message: Signal<Option<String>> = use_signal(|| None);
     let mut notice_message: Signal<Option<String>> = use_signal(|| None);
 
-    let mut drag_over = use_signal(|| false);
-
     let has_active_account = active_account.is_some();
     let title_empty = draft().title.trim().is_empty();
-
-    let displayed_image_preview = selected_image().and_then(|img| img.preview_data_url.clone());
 
     // Single smart status bar: error > saving > notice
     let status: Option<(&'static str, String)> = if let Some(ref err) = error_message() {
@@ -69,17 +65,11 @@ pub fn PublishFeed() -> Element {
 
             // ── No account selected ────────────────────────────────────────
             if active_account.is_none() {
-                div {
-                    class: "empty-state panel-surface",
-                    p { class: "empty-state-title", "No account selected" }
-                    p { class: "empty-state-body",
-                        "Select or create an account on the Dashboard, then come back here to publish a feed."
-                    }
-                    Link {
-                        class: "btn-secondary",
-                        to: Route::Home {},
-                        "Go to Dashboard"
-                    }
+                EmptyState {
+                    title: "No account selected".to_string(),
+                    body: "Select or create an account on the Dashboard, then come back here to publish a feed.".to_string(),
+                    cta_label: Some("Go to Dashboard".to_string()),
+                    cta_route: Some(Route::Home {}),
                 }
             } else {
                 // ── Publish form ───────────────────────────────────────────
@@ -111,85 +101,14 @@ pub fn PublishFeed() -> Element {
                         }
                     }
 
-                    // Image -- drag-and-drop zone
+                    // Image
                     div { class: "field",
                         span { "Image (optional)" }
-                        div {
-                            class: if drag_over() {
-                                "drop-zone drop-zone-active"
-                            } else if displayed_image_preview.is_some() {
-                                "drop-zone drop-zone-has-image"
-                            } else {
-                                "drop-zone"
-                            },
-                            onclick: move |_| {
-                                if is_saving() || !has_active_account { return; }
-                                if let Some(path) = FileDialog::new()
-                                    .add_filter("Images", &["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"])
-                                    .pick_file()
-                                {
-                                    let preview = preview_data_url_for_path(&path).ok();
-                                    let file_name = path
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("feed-image")
-                                        .to_string();
-                                    selected_image.set(Some(SelectedImage {
-                                        path: path.display().to_string(),
-                                        file_name: file_name.clone(),
-                                        preview_data_url: preview,
-                                    }));
-                                    notice_message.set(Some(format!("Selected {file_name}.")));
-                                    error_message.set(None);
-                                }
-                            },
-                            ondragover: move |e| {
-                                e.prevent_default();
-                                drag_over.set(true);
-                            },
-                            ondragleave: move |_| drag_over.set(false),
-                            ondrop: move |e| {
-                                e.prevent_default();
-                                drag_over.set(false);
-                                let file_list = e.files();
-                                if let Some(first) = file_list.first() {
-                                    let path = first.path();
-                                    let preview = preview_data_url_for_path(&path).ok();
-                                    let file_name = first.name();
-                                    selected_image.set(Some(SelectedImage {
-                                        path: path.display().to_string(),
-                                        file_name: file_name.clone(),
-                                        preview_data_url: preview,
-                                    }));
-                                    notice_message.set(Some(format!("Selected {file_name}.")));
-                                    error_message.set(None);
-                                }
-                            },
-
-                            if let Some(ref img_url) = displayed_image_preview {
-                                img {
-                                    class: "drop-zone-preview",
-                                    src: img_url.clone(),
-                                    alt: "Feed image preview",
-                                }
-                                button {
-                                    class: "drop-zone-clear",
-                                    title: "Remove image",
-                                    onclick: move |e| {
-                                        e.stop_propagation();
-                                        selected_image.set(None);
-                                        notice_message.set(None);
-                                    },
-                                    "x"
-                                }
-                            } else {
-                                div { class: "drop-zone-hint",
-                                    span { class: "drop-zone-icon", "I" }
-                                    span { "Drop an image here or click to choose" }
-                                }
-                            }
+                        ImageDropZone {
+                            selected_image,
+                            existing_preview_url: None,
+                            disabled: is_saving() || !has_active_account,
                         }
-
                         if let Some(ref img) = selected_image() {
                             p { class: "field-note", "Pending: {img.file_name}" }
                         }
