@@ -1,57 +1,49 @@
-# Development
+# acuity-dioxus
 
-Your new jumpstart project includes basic organization with an organized `assets` folder and a `components` folder.
-If you chose to develop with the router feature, you will also have a `views` folder.
+A [Dioxus 0.7](https://dioxuslabs.com/learn/0.7) desktop dapp for the [Acuity](https://acuity.social) decentralized social media platform. It connects to a local Acuity Substrate node, an IPFS daemon, and an Acuity indexer to provide account management, content publishing, and browsing.
 
-```
-project/
-├─ assets/ # Any assets that are used by the app should be placed here
-├─ src/
-│  ├─ main.rs # The entrypoint for the app. It also defines the routes for the app.
-│  ├─ components/
-│  │  ├─ mod.rs # Defines the components module
-│  │  ├─ hero.rs # The Hero component for use in the home page
-│  ├─ views/ # The views each route will render in the app.
-│  │  ├─ mod.rs # Defines the module for the views route and re-exports the components for each route
-│  │  ├─ blog.rs # The component that will render at the /blog/:id route
-│  │  ├─ home.rs # The component that will render at the / route
-├─ Cargo.toml # The Cargo.toml file defines the dependencies and feature flags for your project
-```
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a full description of the module structure, routing, service connections, content protocol, and key dependencies.
 
-### Automatic Tailwind (Dioxus 0.7+)
+---
 
-As of Dioxus 0.7, there no longer is a need to manually install tailwind. Simply `dx serve` and you're good to go!
+## Prerequisites
 
-Automatic tailwind is supported by checking for a file called `tailwind.css` in your app's manifest directory (next to Cargo.toml). To customize the file, use the dioxus.toml:
+| Requirement | Notes |
+|---|---|
+| Rust (2024 edition) | Install via [rustup](https://rustup.rs) |
+| `dx` CLI | `curl -sSL https://dioxus.dev/install.sh \| sh` |
+| `just` | `cargo install just` — needed to regenerate Subxt bindings |
+| `subxt` CLI | `cargo install subxt-cli` — needed to regenerate Subxt bindings |
+| Acuity node | Listening at `ws://127.0.0.1:9944` |
+| IPFS daemon | API at `http://127.0.0.1:5001` |
+| Acuity indexer | WebSocket at `ws://127.0.0.1:8172` |
 
-```toml
-[application]
-tailwind_input = "my.css"
-tailwind_output = "assets/out.css"
-```
+The app starts and reconnects gracefully even if services are unavailable, but publishing and browsing content requires all three.
 
-### Tailwind Manual Install
+---
 
-To use tailwind plugins or manually customize tailwind, you can can install the Tailwind CLI and use it directly.
+## Running
 
-1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-2. Install the Tailwind CSS CLI: https://tailwindcss.com/docs/installation/tailwind-cli
-3. Run the following command in the root of the project to start the Tailwind CSS compiler:
-
-```bash
-npx @tailwindcss/cli -i ./input.css -o ./assets/tailwind.css --watch
+```sh
+dx serve                        # desktop (default)
+dx serve --platform web         # web
+dx serve --platform mobile      # mobile
 ```
 
-### Serving Your App
+---
 
-Run the following command in the root of your project to start developing with the default platform:
+## Regenerating Subxt Bindings
 
-```bash
-dx serve
+`src/acuity_runtime.rs` is auto-generated from a live node. With the node running:
+
+```sh
+just generate-runtime-api
 ```
 
-To run for a different platform, use the `--platform platform` flag. E.g.
-```bash
-dx serve --platform desktop
-```
+Do not edit `src/acuity_runtime.rs` manually.
 
+---
+
+## Contributing
+
+Follow standard Rust conventions. The project enforces a `clippy.toml` rule that bans holding Dioxus signal guards (`GenerationalRef`, `GenerationalRefMut`, `WriteLock`) across `await` points — ensure `cargo clippy` passes before submitting changes. Update `ARCHITECTURE.md` whenever structural changes are made (new routes, modules, pallets, or service URLs).
