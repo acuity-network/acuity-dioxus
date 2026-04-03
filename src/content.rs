@@ -539,7 +539,7 @@ pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionE
         let revision_id = event
             .fields
             .get("revision_id")
-            .and_then(|value| value.as_u64())
+            .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
             .ok_or_else(|| "PublishRevision event was missing a revision_id field.".to_string())?
             as u32;
 
