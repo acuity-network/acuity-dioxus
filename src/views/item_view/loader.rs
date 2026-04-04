@@ -10,6 +10,7 @@ use crate::{
     runtime_client::connect as connect_acuity_client,
 };
 use prost::Message;
+use serde_json::Value;
 use sp_core::crypto::Ss58Codec;
 
 use super::types::{content_type_label, LoadedItem, ParentSummary};
@@ -177,7 +178,7 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
         let event_item_id = event
             .fields
             .get("item_id")
-            .and_then(|v| v.as_str())
+            .and_then(Value::as_str)
             .unwrap_or_default();
 
         // Only process the event that belongs to *this* item, not child items.
@@ -189,18 +190,24 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
         // of hex strings or objects with an inner value field.
         if let Some(parents_val) = event.fields.get("parents") {
             if let Some(arr) = parents_val.as_array() {
-                for entry in arr {
+                for entry in arr.iter() {
                     // Try plain string first, then {"0": "0xabc..."} or nested.
                     let hex = if let Some(s) = entry.as_str() {
                         s.to_string()
-                    } else if let Some(s) = entry.get("0").and_then(|v| v.as_str()) {
-                        s.to_string()
+                    } else if let Some(object) = entry.as_object() {
+                        object
+                            .get("0")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                            .unwrap_or_default()
                     } else {
-                        continue;
+                        String::new()
                     };
-                    if !hex.is_empty() {
-                        parent_hex_ids.push(hex);
+
+                    if hex.is_empty() {
+                        continue;
                     }
+                    parent_hex_ids.push(hex);
                 }
             }
         }

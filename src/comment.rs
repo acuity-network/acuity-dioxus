@@ -10,6 +10,7 @@ use crate::content::{
     IndexerStoredEvent, ItemMessage, LanguageMixinMessage, MixinPayloadMessage,
     RevisionEntry, BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, LANGUAGE_MIXIN_ID,
 };
+use serde_json::Value;
 
 /// Mixin ID that marks a content item as a comment. Matches the original
 /// Ethereum implementation (`0x874aba65`).
@@ -210,7 +211,7 @@ pub fn load_comments_for_item(
             let child_item_id = event
                 .fields
                 .get("item_id")
-                .and_then(|v| v.as_str())
+                .and_then(Value::as_str)
                 .unwrap_or_default();
 
             if child_item_id.is_empty() || child_item_id == item_id_hex {

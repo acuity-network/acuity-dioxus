@@ -20,7 +20,7 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 
 **IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
 
-**Indexer loop** (`watch_indexer`): Sends `SubscribeStatus` + `Status` on connect to receive indexed block-span data. One-off `GetEvents` queries for item data are made directly from `src/content.rs`.
+**Indexer loop** (`watch_indexer`): Sends request/response websocket messages with numeric `id`s. On connect it sends `SubscribeStatus` + `Status`, ignores the `subscriptionStatus` acknowledgement, and applies `status` responses/notifications to keep indexed block-span data current. One-off `GetEvents` queries for item data are made directly from `src/content.rs` and now also use request ids plus explicit `error` response handling.
 
 ---
 
@@ -70,6 +70,7 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `src/accounts.rs` | Local keystore: sr25519 keypair generation, Polkadot-JS–compatible scrypt + XSalsa20-Poly1305 encryption, `AccountStore` CRUD |
 | `src/profile.rs` | Load profile (indexer + IPFS) and save profile (encode protobuf, upload to IPFS, submit batched extrinsics) |
 | `src/feed.rs` | Publish feeds (`publish_item` + `account_content::add_item`), resolve feed item summaries, list account pinned content |
+| `src/indexer_api.rs` | Shared Acuity indexer websocket protocol types: request envelopes, keys, event payloads, status spans, and error payloads |
 | `src/post.rs` | Publish posts (single `content.publish_item` with parent feed reference) |
 | `src/item.rs` | `publish_item_revision` — encode revised item payload, upload to IPFS, submit `content::publish_revision` extrinsic; `encode_revised_item` builder |
 | `src/comment.rs` | Publish, revise, and recursively load comment trees; detects `COMMENT_TYPE_MIXIN_ID` |

@@ -5,6 +5,7 @@ use crate::content::{
     IMAGE_MIXIN_ID, TITLE_MIXIN_ID,
 };
 use prost::Message;
+use serde_json::Value;
 
 use super::types::FeedPost;
 
@@ -37,7 +38,7 @@ pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String>
         let child_item_id = event
             .fields
             .get("item_id")
-            .and_then(|v| v.as_str())
+            .and_then(Value::as_str)
             .unwrap_or_default();
 
         if child_item_id.is_empty() || child_item_id == item_id_hex {
