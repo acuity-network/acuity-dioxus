@@ -20,7 +20,7 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 
 **IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
 
-**Indexer loop** (`watch_indexer`): Uses the local `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
+**Indexer loop** (`watch_indexer`): Uses the published `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
 
 ---
 
