@@ -1,11 +1,12 @@
 use crate::{
     acuity_runtime::api,
     content::{
-        bytes32_to_hex, decode_single_mixin, fetch_events_for_item, fetch_ipfs_digest_bytes,
-        fetch_latest_revision_hash, fetch_revision_history, hex_to_bytes32,
-        preview_data_url_for_image_mixin, short_hex, BodyTextMixinMessage, IndexerStoredEvent,
-        ItemMessage, RevisionEntry, TitleMixinMessage, BODY_TEXT_MIXIN_ID, IMAGE_MIXIN_ID,
-        LANGUAGE_MIXIN_ID, TITLE_MIXIN_ID,
+        bytes32_to_hex, decode_single_mixin, event_string_field, fetch_events_for_item,
+        fetch_ipfs_digest_bytes, fetch_latest_revision_hash, fetch_revision_history, hex_to_bytes32,
+        is_content_event,
+        preview_data_url_for_image_mixin, short_hex, BodyTextMixinMessage, ItemMessage,
+        RevisionEntry, TitleMixinMessage, BODY_TEXT_MIXIN_ID, IMAGE_MIXIN_ID, LANGUAGE_MIXIN_ID,
+        TITLE_MIXIN_ID,
     },
     runtime_client::connect as connect_acuity_client,
 };
@@ -164,22 +165,11 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
     // Find the PublishItem event whose item_id matches this item (not a child).
     let mut parent_hex_ids: Vec<String> = Vec::new();
     for decoded_event in &decoded_events {
-        let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event.clone())
-            .unwrap_or_else(|_| IndexerStoredEvent {
-                pallet_name: String::new(),
-                event_name: String::new(),
-                fields: serde_json::Value::Null,
-            });
-
-        if event.pallet_name != "Content" || event.event_name != "PublishItem" {
+        if !is_content_event(decoded_event, "PublishItem") {
             continue;
         }
 
-        let event_item_id = event
-            .fields
-            .get("item_id")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+        let event_item_id = event_string_field(decoded_event, "item_id").unwrap_or_default();
 
         // Only process the event that belongs to *this* item, not child items.
         if event_item_id != item_id_hex {
@@ -188,7 +178,7 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
 
         // Extract the parents array — the indexer stores it as a JSON array
         // of hex strings or objects with an inner value field.
-        if let Some(parents_val) = event.fields.get("parents") {
+        if let Some(parents_val) = decoded_event.field("parents") {
             if let Some(arr) = parents_val.as_array() {
                 for entry in arr.iter() {
                     // Try plain string first, then {"0": "0xabc..."} or nested.

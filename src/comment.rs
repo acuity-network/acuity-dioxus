@@ -5,12 +5,12 @@ use rand::RngCore;
 use crate::accounts::AccountStore;
 use crate::content::{
     account_id_from_ss58, bytes32_to_hex, decode_single_mixin, derive_item_id,
-    fetch_events_for_item, fetch_ipfs_digest_bytes, fetch_latest_revision_hash,
-    fetch_revision_history, hex_to_bytes32, upload_ipfs_digest, BodyTextMixinMessage,
-    IndexerStoredEvent, ItemMessage, LanguageMixinMessage, MixinPayloadMessage,
-    RevisionEntry, BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, LANGUAGE_MIXIN_ID,
+    event_string_field, fetch_events_for_item, fetch_ipfs_digest_bytes,
+    fetch_latest_revision_hash, fetch_revision_history, hex_to_bytes32, is_content_event,
+    upload_ipfs_digest, BodyTextMixinMessage, ItemMessage, LanguageMixinMessage,
+    MixinPayloadMessage, RevisionEntry,
+    BODY_TEXT_MIXIN_ID, DEFAULT_LANGUAGE_TAG, LANGUAGE_MIXIN_ID,
 };
-use serde_json::Value;
 
 /// Mixin ID that marks a content item as a comment. Matches the original
 /// Ethereum implementation (`0x874aba65`).
@@ -197,22 +197,11 @@ pub fn load_comments_for_item(
 
         let mut child_item_ids: Vec<String> = Vec::new();
         for decoded_event in &decoded_events {
-            let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event.clone())
-                .unwrap_or_else(|_| IndexerStoredEvent {
-                    pallet_name: String::new(),
-                    event_name: String::new(),
-                    fields: serde_json::Value::Null,
-                });
-
-            if event.pallet_name != "Content" || event.event_name != "PublishItem" {
+            if !is_content_event(decoded_event, "PublishItem") {
                 continue;
             }
 
-            let child_item_id = event
-                .fields
-                .get("item_id")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
+            let child_item_id = event_string_field(decoded_event, "item_id").unwrap_or_default();
 
             if child_item_id.is_empty() || child_item_id == item_id_hex {
                 continue;

@@ -22,6 +22,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a full description of the module stru
 The app starts and reconnects gracefully even if services are unavailable, but publishing and browsing content requires all three.
 
 The dapp uses the local `acuity-index-api-rs` crate as its indexer client instead of implementing the indexer websocket protocol directly in this repository.
+Event loading now uses the crate's typed `DecodedEvent` and `StoredEvent` helpers directly rather than reparsing raw JSON event payloads inside the app.
 
 ---
 
@@ -50,3 +51,12 @@ Do not edit `src/acuity_runtime.rs` manually.
 ## Contributing
 
 Follow standard Rust conventions. The project enforces a `clippy.toml` rule that bans holding Dioxus signal guards (`GenerationalRef`, `GenerationalRefMut`, `WriteLock`) across `await` points — ensure `cargo clippy` passes before submitting changes. Update `ARCHITECTURE.md` whenever structural changes are made (new routes, modules, pallets, or service URLs).
+
+## Verification
+
+The current indexer API migration has been verified with:
+
+```sh
+cargo test
+cargo check
+```

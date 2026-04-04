@@ -10,14 +10,6 @@ use serde_json::Value;
 use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IndexerStoredEvent {
-    pub pallet_name: String,
-    pub event_name: String,
-    pub fields: Value,
-}
-
 // ── Formatting utilities ──────────────────────────────────────────────────────
 
 /// Abbreviates a long hex string to `first10...last8` for display.
@@ -423,6 +415,14 @@ pub async fn fetch_events_for_item(
     Ok(response.decoded_events)
 }
 
+pub fn is_content_event(decoded_event: &IndexerDecodedEvent, event_name: &str) -> bool {
+    decoded_event.pallet_name() == "Content" && decoded_event.event_name() == event_name
+}
+
+pub fn event_string_field<'a>(decoded_event: &'a IndexerDecodedEvent, field_name: &str) -> Option<&'a str> {
+    decoded_event.field(field_name).and_then(Value::as_str)
+}
+
 fn item_id_query_key(item_id_hex: &str) -> Result<Key, String> {
     let item_id = hex_to_bytes32(item_id_hex)?;
     Ok(Key::Custom(CustomKey {
@@ -458,23 +458,16 @@ pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionE
     let mut entries: Vec<RevisionEntry> = Vec::new();
 
     for decoded_event in decoded_events {
-        let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event)
-            .map_err(|error| format!("Failed to decode indexed event payload: {error}"))?;
-
-        if event.pallet_name != "Content" || event.event_name != "PublishRevision" {
+        if !is_content_event(&decoded_event, "PublishRevision") {
             continue;
         }
 
-        let ipfs_hash_hex = event
-            .fields
-            .get("ipfs_hash")
-            .and_then(|value| value.as_str())
+        let ipfs_hash_hex = event_string_field(&decoded_event, "ipfs_hash")
             .ok_or_else(|| "PublishRevision event was missing an ipfs_hash field.".to_string())?
             .to_string();
 
-        let revision_id = event
-            .fields
-            .get("revision_id")
+        let revision_id = decoded_event
+            .field("revision_id")
             .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
             .ok_or_else(|| "PublishRevision event was missing a revision_id field.".to_string())?
             as u32;
@@ -500,7 +493,9 @@ pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acuity_index_api_rs::StoredEvent;
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
+    use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{env, fs, path::PathBuf, process};
 
@@ -668,6 +663,132 @@ mod tests {
         let error = item_id_query_key("0x1234").unwrap_err();
 
         assert_eq!(error, "Expected 32 bytes for 0x1234.");
+    }
+
+    #[test]
+    fn typed_decoded_event_exposes_publish_revision_fields() {
+        let ipfs_hash = format!("0x{}", "12".repeat(32));
+        let decoded_event = IndexerDecodedEvent {
+            block_number: 10,
+            event_index: 2,
+            event: StoredEvent {
+                spec_version: 1,
+                pallet_name: "Content".to_string(),
+                event_name: "PublishRevision".to_string(),
+                pallet_index: 7,
+                variant_index: 3,
+                event_index: 2,
+                fields: json!({
+                    "ipfs_hash": ipfs_hash,
+                    "revision_id": "7"
+                }),
+            },
+        };
+
+        assert_eq!(decoded_event.pallet_name(), "Content");
+        assert_eq!(decoded_event.event_name(), "PublishRevision");
+        assert_eq!(decoded_event.field("ipfs_hash").and_then(|value| value.as_str()), Some(ipfs_hash.as_str()));
+        assert_eq!(
+            decoded_event
+                .field("revision_id")
+                .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok())),
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn typed_decoded_event_preserves_parent_array_shapes() {
+        let item_id = format!("0x{}", "34".repeat(32));
+        let parent_a = format!("0x{}", "56".repeat(32));
+        let parent_b = format!("0x{}", "78".repeat(32));
+        let decoded_event = IndexerDecodedEvent {
+            block_number: 11,
+            event_index: 4,
+            event: StoredEvent {
+                spec_version: 1,
+                pallet_name: "Content".to_string(),
+                event_name: "PublishItem".to_string(),
+                pallet_index: 7,
+                variant_index: 1,
+                event_index: 4,
+                fields: json!({
+                    "item_id": item_id,
+                    "parents": [
+                        parent_a,
+                        {"0": parent_b}
+                    ]
+                }),
+            },
+        };
+
+        let parents = decoded_event
+            .field("parents")
+            .and_then(|value| value.as_array())
+            .unwrap();
+
+        assert_eq!(decoded_event.field("item_id").and_then(|value| value.as_str()), Some(item_id.as_str()));
+        assert_eq!(parents.len(), 2);
+        assert_eq!(parents[0].as_str(), Some(parent_a.as_str()));
+        assert_eq!(parents[1].get("0").and_then(|value| value.as_str()), Some(parent_b.as_str()));
+    }
+
+    #[test]
+    fn is_content_event_matches_only_requested_content_variant() {
+        let content_event = IndexerDecodedEvent {
+            block_number: 1,
+            event_index: 1,
+            event: StoredEvent {
+                spec_version: 1,
+                pallet_name: "Content".to_string(),
+                event_name: "PublishItem".to_string(),
+                pallet_index: 1,
+                variant_index: 1,
+                event_index: 1,
+                fields: json!({}),
+            },
+        };
+        let other_event = IndexerDecodedEvent {
+            block_number: 1,
+            event_index: 2,
+            event: StoredEvent {
+                spec_version: 1,
+                pallet_name: "Balances".to_string(),
+                event_name: "Transfer".to_string(),
+                pallet_index: 2,
+                variant_index: 3,
+                event_index: 2,
+                fields: json!({}),
+            },
+        };
+
+        assert!(is_content_event(&content_event, "PublishItem"));
+        assert!(!is_content_event(&content_event, "PublishRevision"));
+        assert!(!is_content_event(&other_event, "PublishItem"));
+    }
+
+    #[test]
+    fn event_string_field_returns_only_string_values() {
+        let item_id = format!("0x{}", "ab".repeat(32));
+        let decoded_event = IndexerDecodedEvent {
+            block_number: 2,
+            event_index: 1,
+            event: StoredEvent {
+                spec_version: 1,
+                pallet_name: "Content".to_string(),
+                event_name: "PublishItem".to_string(),
+                pallet_index: 1,
+                variant_index: 1,
+                event_index: 1,
+                fields: json!({
+                    "item_id": item_id,
+                    "revision_id": 5
+                }),
+            },
+        };
+
+        assert_eq!(event_string_field(&decoded_event, "item_id"), Some(item_id.as_str()));
+        assert_eq!(event_string_field(&decoded_event, "revision_id"), None);
+        assert_eq!(event_string_field(&decoded_event, "missing"), None);
     }
 
 }

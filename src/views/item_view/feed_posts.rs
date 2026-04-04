@@ -1,11 +1,10 @@
 use crate::content::{
-    decode_single_mixin, fetch_events_for_item, fetch_ipfs_digest_bytes,
-    fetch_latest_revision_hash, hex_to_bytes32, preview_data_url_for_image_mixin,
-    BodyTextMixinMessage, IndexerStoredEvent, ItemMessage, TitleMixinMessage, BODY_TEXT_MIXIN_ID,
-    IMAGE_MIXIN_ID, TITLE_MIXIN_ID,
+    decode_single_mixin, event_string_field, fetch_events_for_item, fetch_ipfs_digest_bytes,
+    fetch_latest_revision_hash, hex_to_bytes32, is_content_event,
+    preview_data_url_for_image_mixin, BodyTextMixinMessage, ItemMessage, TitleMixinMessage,
+    BODY_TEXT_MIXIN_ID, IMAGE_MIXIN_ID, TITLE_MIXIN_ID,
 };
 use prost::Message;
-use serde_json::Value;
 
 use super::types::FeedPost;
 
@@ -18,14 +17,7 @@ pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String>
     // Collect child item IDs from PublishItem events where this feed is a parent.
     let mut child_item_ids: Vec<String> = Vec::new();
     for decoded_event in &decoded_events {
-        let event = serde_json::from_value::<IndexerStoredEvent>(decoded_event.event.clone())
-            .unwrap_or_else(|_| IndexerStoredEvent {
-                pallet_name: String::new(),
-                event_name: String::new(),
-                fields: serde_json::Value::Null,
-            });
-
-        if event.pallet_name != "Content" || event.event_name != "PublishItem" {
+        if !is_content_event(decoded_event, "PublishItem") {
             continue;
         }
 
@@ -35,11 +27,7 @@ pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String>
         // the feed's item_id returns PublishItem events for children that
         // declared this feed as a parent. But it also returns the feed's own
         // PublishItem event. Skip the feed's own event by checking item_id.
-        let child_item_id = event
-            .fields
-            .get("item_id")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+        let child_item_id = event_string_field(decoded_event, "item_id").unwrap_or_default();
 
         if child_item_id.is_empty() || child_item_id == item_id_hex {
             continue;
