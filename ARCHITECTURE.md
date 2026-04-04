@@ -12,7 +12,7 @@ Three background async loops are spawned once in `App` (`src/main.rs`) via `use_
 |---|---|---|---|
 | `Signal<ChainConnection>` | Acuity Substrate node | Subxt WebSocket | `ws://127.0.0.1:9944` |
 | `Signal<IpfsConnection>` | IPFS daemon | HTTP polling (`/api/v0/id`) | `http://127.0.0.1:5001` |
-| `Signal<IndexerConnection>` | Acuity indexer | WebSocket (JSON messages) | `ws://127.0.0.1:8172` |
+| `Signal<IndexerConnection>` | Acuity indexer | `acuity-index-api-rs` over WebSocket | `ws://127.0.0.1:8172` |
 
 All three connections share the same lifecycle pattern: `Connecting → Connected → Reconnecting` (2 s delay), represented by the `ConnectionStatus` enum.
 
@@ -20,7 +20,7 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 
 **IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
 
-**Indexer loop** (`watch_indexer`): Sends request/response websocket messages with numeric `id`s. On connect it sends `SubscribeStatus` + `Status`, ignores the `subscriptionStatus` acknowledgement, and applies `status` responses/notifications to keep indexed block-span data current. One-off `GetEvents` queries for item data are made directly from `src/content.rs` and now also use request ids plus explicit `error` response handling.
+**Indexer loop** (`watch_indexer`): Uses the local `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`.
 
 ---
 
@@ -66,11 +66,10 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `src/main.rs` | Entry point, `Route` enum, `App` component, global context providers, three connection-watcher loops |
 | `src/runtime_client.rs` | `type AcuityClient = OnlineClient<PolkadotConfig>` and `connect()` targeting `ws://127.0.0.1:9944` |
 | `src/acuity_runtime.rs` | **Auto-generated** (~9 900 lines). Typed Subxt bindings for the Acuity Substrate runtime. Regenerate with `just generate-runtime-api`. Do not edit manually. |
-| `src/content.rs` | Protobuf message types, mixin ID constants, IPFS upload/download helpers, item ID derivation, indexer event queries, CID↔hex conversion utilities, `short_hex` display helper |
+| `src/content.rs` | Protobuf message types, mixin ID constants, IPFS upload/download helpers, item ID derivation, indexer event queries via `acuity-index-api-rs`, local stored-event decoding, CID↔hex conversion utilities, `short_hex` display helper |
 | `src/accounts.rs` | Local keystore: sr25519 keypair generation, Polkadot-JS–compatible scrypt + XSalsa20-Poly1305 encryption, `AccountStore` CRUD |
 | `src/profile.rs` | Load profile (indexer + IPFS) and save profile (encode protobuf, upload to IPFS, submit batched extrinsics) |
 | `src/feed.rs` | Publish feeds (`publish_item` + `account_content::add_item`), resolve feed item summaries, list account pinned content |
-| `src/indexer_api.rs` | Shared Acuity indexer websocket protocol types: request envelopes, keys, event payloads, status spans, and error payloads |
 | `src/post.rs` | Publish posts (single `content.publish_item` with parent feed reference) |
 | `src/item.rs` | `publish_item_revision` — encode revised item payload, upload to IPFS, submit `content::publish_revision` extrinsic; `encode_revised_item` builder |
 | `src/comment.rs` | Publish, revise, and recursively load comment trees; detects `COMMENT_TYPE_MIXIN_ID` |
@@ -189,7 +188,8 @@ Accessed via the auto-generated `src/acuity_runtime.rs`:
 | `scrypt 0.11` | Password key derivation |
 | `crypto_secretbox 0.1.1` | XSalsa20-Poly1305 encryption |
 | `reqwest 0.12` | HTTP client for IPFS API |
-| `tokio-tungstenite 0.28` | WebSocket client for indexer and one-off IPFS queries |
+| `acuity-index-api-rs` | Shared indexer client used for status subscriptions and event queries |
+| `tokio-tungstenite 0.28` | WebSocket client for one-off IPFS queries |
 | `image 0.25` | Image decode and mipmap resize |
 | `rfd 0.15` | Native file picker dialog |
 | `fast_qr 0.12` | SVG QR code generation (Fund dialog) |

@@ -176,7 +176,7 @@ pub fn IndexerStatus() -> Element {
                         }
                         MetadataField {
                             label: "Subscription mode".to_string(),
-                            value: "SubscribeStatus + Status bootstrap".to_string(),
+                            value: "acuity-index-api-rs status snapshot + subscription".to_string(),
                             mono: false,
                         }
                     }

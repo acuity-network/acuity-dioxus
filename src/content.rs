@@ -1,20 +1,22 @@
 use crate::{INDEXER_URL, IPFS_API_URL};
-use crate::indexer_api::{
-    GetEventsPayload, IndexerCustomKey, IndexerDecodedEvent, IndexerEnvelope,
-    IndexerErrorPayload, IndexerEventsData, IndexerKey, IndexerRequest, IndexerScalarValue,
-};
+use acuity_index_api_rs::{Bytes32, CustomKey, CustomValue, DecodedEvent as IndexerDecodedEvent, IndexerClient, Key};
 use base64::Engine;
-use futures::{SinkExt, StreamExt};
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
 use parity_scale_codec::Encode;
 use prost::Message;
 use reqwest::{multipart, Client};
 use serde::Deserialize;
+use serde_json::Value;
 use sp_core::{crypto::AccountId32, crypto::Ss58Codec, hashing::blake2_256};
 use std::{fs, io::Cursor, path::Path};
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 
-pub use crate::indexer_api::IndexerStoredEvent;
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexerStoredEvent {
+    pub pallet_name: String,
+    pub event_name: String,
+    pub fields: Value,
+}
 
 // ── Formatting utilities ──────────────────────────────────────────────────────
 
@@ -410,87 +412,23 @@ where
 pub async fn fetch_events_for_item(
     item_id_hex: String,
 ) -> Result<Vec<IndexerDecodedEvent>, String> {
-    let (mut stream, _) = connect_async(INDEXER_URL)
+    let client = IndexerClient::connect(INDEXER_URL)
         .await
         .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
-
-    let request = IndexerRequest {
-        id: 1,
-        message_type: "GetEvents",
-        payload: GetEventsPayload {
-            key: IndexerKey::Custom(IndexerCustomKey {
-                name: "item_id".to_string(),
-                kind: "bytes32".to_string(),
-                value: IndexerScalarValue::String(item_id_hex),
-            }),
-            limit: None,
-            before: None,
-        },
-    };
-
-    stream
-        .send(WsMessage::Text(
-            serde_json::to_string(&request)
-                .map_err(|error| format!("Failed to encode indexer request: {error}"))?
-                .into(),
-        ))
+    let response = client
+        .get_events(item_id_query_key(&item_id_hex)?, None, None)
         .await
         .map_err(|error| format!("Failed to query the indexer: {error}"))?;
 
-    while let Some(message) = stream.next().await {
-        let message =
-            message.map_err(|error| format!("Failed to read indexer response: {error}"))?;
-
-        let payload = match message {
-            WsMessage::Text(text) => text.to_string(),
-            WsMessage::Binary(bytes) => std::str::from_utf8(&bytes)
-                .map_err(|error| format!("Indexer returned invalid UTF-8: {error}"))?
-                .to_string(),
-            WsMessage::Close(_) => break,
-            WsMessage::Ping(_) | WsMessage::Pong(_) | WsMessage::Frame(_) => continue,
-        };
-
-        let envelope = serde_json::from_str::<IndexerEnvelope>(&payload)
-            .map_err(|error| format!("Failed to decode indexer event response: {error}"))?;
-
-        match parse_indexer_events_envelope(envelope, request.id)? {
-            Some(decoded_events) => return Ok(decoded_events),
-            None => continue,
-        }
-    }
-
-    Err("The indexer closed the websocket before returning events.".to_string())
+    Ok(response.decoded_events)
 }
 
-fn parse_indexer_events_envelope(
-    envelope: IndexerEnvelope,
-    request_id: u64,
-) -> Result<Option<Vec<IndexerDecodedEvent>>, String> {
-    match envelope.message_type.as_str() {
-        "events" if envelope.id == Some(request_id) => {
-            let response = serde_json::from_value::<IndexerEventsData>(
-                envelope.data.ok_or_else(|| {
-                    "Indexer events response did not include any event data.".to_string()
-                })?,
-            )
-            .map_err(|error| format!("Failed to decode indexer events payload: {error}"))?;
-
-            Ok(Some(response.decoded_events))
-        }
-        "error" if envelope.id == Some(request_id) => {
-            let error = serde_json::from_value::<IndexerErrorPayload>(envelope.data.ok_or_else(
-                || "Indexer error response did not include any error data.".to_string(),
-            )?)
-            .map_err(|decode_error| {
-                format!("Failed to decode indexer error payload: {decode_error}")
-            })?;
-            Err(format!(
-                "Indexer rejected GetEvents with {}: {}",
-                error.code, error.message
-            ))
-        }
-        _ => Ok(None),
-    }
+fn item_id_query_key(item_id_hex: &str) -> Result<Key, String> {
+    let item_id = hex_to_bytes32(item_id_hex)?;
+    Ok(Key::Custom(CustomKey {
+        name: "item_id".to_string(),
+        value: CustomValue::Bytes32(Bytes32(item_id)),
+    }))
 }
 
 pub async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, String> {
@@ -563,7 +501,6 @@ pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionE
 mod tests {
     use super::*;
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
-    use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::{env, fs, path::PathBuf, process};
 
@@ -712,61 +649,25 @@ mod tests {
     }
 
     #[test]
-    fn parse_indexer_events_envelope_returns_matching_events_response() {
-        let envelope = IndexerEnvelope {
-            id: Some(7),
-            message_type: "events".to_string(),
-            data: Some(json!({
-                "decodedEvents": [
-                    {
-                        "event": {
-                            "palletName": "Content",
-                            "eventName": "PublishRevision",
-                            "fields": {
-                                "revision_id": 1,
-                                "ipfs_hash": "0x11"
-                            }
-                        }
-                    }
-                ]
-            })),
-        };
+    fn item_id_query_key_uses_bytes32_value() {
+        let item_id_hex = format!("0x{}", "ab".repeat(32));
 
-        let decoded_events = parse_indexer_events_envelope(envelope, 7)
-            .unwrap()
-            .unwrap();
+        let key = item_id_query_key(&item_id_hex).unwrap();
 
-        assert_eq!(decoded_events.len(), 1);
-        assert_eq!(decoded_events[0].event["palletName"], "Content");
+        assert_eq!(
+            key,
+            Key::Custom(CustomKey {
+                name: "item_id".to_string(),
+                value: CustomValue::Bytes32(Bytes32([0xab; 32])),
+            })
+        );
     }
 
     #[test]
-    fn parse_indexer_events_envelope_ignores_other_request_ids() {
-        let envelope = IndexerEnvelope {
-            id: Some(8),
-            message_type: "events".to_string(),
-            data: Some(json!({ "decodedEvents": [] })),
-        };
+    fn item_id_query_key_rejects_invalid_hex() {
+        let error = item_id_query_key("0x1234").unwrap_err();
 
-        let result = parse_indexer_events_envelope(envelope, 7).unwrap();
-
-        assert!(result.is_none());
+        assert_eq!(error, "Expected 32 bytes for 0x1234.");
     }
 
-    #[test]
-    fn parse_indexer_events_envelope_surfaces_error_response() {
-        let envelope = IndexerEnvelope {
-            id: Some(7),
-            message_type: "error".to_string(),
-            data: Some(json!({
-                "code": "invalid_request",
-                "message": "missing field `id`"
-            })),
-        };
-
-        let error = parse_indexer_events_envelope(envelope, 7).unwrap_err();
-
-        assert!(error.contains("invalid_request"));
-        assert!(error.contains("missing field `id`"));
-    }
 }

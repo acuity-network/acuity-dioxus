@@ -1,16 +1,11 @@
 use dioxus::prelude::*;
-use futures::{SinkExt, StreamExt};
+use acuity_index_api_rs::{IndexerClient, Span as IndexerSpan};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use acuity_runtime::api;
 use accounts::load_account_store;
-use indexer_api::{
-    EmptyPayload, IndexerEnvelope, IndexerErrorPayload, IndexerRequest, IndexerSpan,
-    IndexerSubscriptionTerminatedPayload,
-};
 use runtime_client::connect as connect_acuity_client;
 use views::{
     ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ItemView, ManageAccounts, Navbar,
@@ -205,7 +200,6 @@ mod acuity_runtime;
 mod comment;
 mod content;
 mod feed;
-mod indexer_api;
 mod item;
 mod post;
 mod profile;
@@ -434,121 +428,31 @@ async fn watch_indexer(mut indexer_connection: Signal<IndexerConnection>) {
 }
 
 async fn maintain_indexer_connection(
-    indexer_connection: Signal<IndexerConnection>,
+    mut indexer_connection: Signal<IndexerConnection>,
 ) -> Result<(), String> {
-    let (stream, _) = connect_async(INDEXER_URL)
+    let client = IndexerClient::connect(INDEXER_URL)
         .await
         .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
-
-    let (mut sender, mut receiver) = stream.split();
-
-    let subscribe_request = IndexerRequest {
-        id: 1,
-        message_type: "SubscribeStatus",
-        payload: EmptyPayload::default(),
-    };
-    sender
-        .send(Message::Text(
-            serde_json::to_string(&subscribe_request)
-                .map_err(|error| format!("Failed to encode status subscription request: {error}"))?
-                .into(),
-        ))
-        .await
-        .map_err(|error| format!("Failed to subscribe to indexer status: {error}"))?;
-
-    let status_request = IndexerRequest {
-        id: 2,
-        message_type: "Status",
-        payload: EmptyPayload::default(),
-    };
-    sender
-        .send(Message::Text(
-            serde_json::to_string(&status_request)
-                .map_err(|error| format!("Failed to encode status snapshot request: {error}"))?
-                .into(),
-        ))
+    let spans = client
+        .status()
         .await
         .map_err(|error| format!("Failed to request indexer status snapshot: {error}"))?;
 
-    while let Some(message) = receiver.next().await {
-        let message =
-            message.map_err(|error| format!("Failed to read indexer message: {error}"))?;
+    indexer_connection.set(IndexerConnection::connected(IndexerDetails { spans }));
 
-        match message {
-            Message::Text(payload) => apply_indexer_message(indexer_connection, payload.as_ref())?,
-            Message::Binary(payload) => {
-                let payload = std::str::from_utf8(&payload)
-                    .map_err(|error| format!("Indexer sent invalid UTF-8 payload: {error}"))?;
-                apply_indexer_message(indexer_connection, payload)?;
-            }
-            Message::Close(_) => return Ok(()),
-            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => {}
-        }
+    let mut subscription = client
+        .subscribe_status()
+        .await
+        .map_err(|error| format!("Failed to subscribe to indexer status: {error}"))?;
+
+    while let Some(update) = subscription.next().await {
+        let update = update.map_err(|error| format!("Failed to read indexer message: {error}"))?;
+        indexer_connection.set(IndexerConnection::connected(IndexerDetails {
+            spans: update.spans,
+        }));
     }
 
     Ok(())
-}
-
-fn apply_indexer_message(
-    mut indexer_connection: Signal<IndexerConnection>,
-    payload: &str,
-) -> Result<(), String> {
-    if let Some(spans) = parse_indexer_status_message(payload)? {
-        indexer_connection.set(IndexerConnection::connected(IndexerDetails { spans }));
-    }
-
-    Ok(())
-}
-
-fn parse_indexer_status_message(payload: &str) -> Result<Option<Vec<IndexerSpan>>, String> {
-    let response = serde_json::from_str::<IndexerEnvelope>(payload)
-        .map_err(|error| format!("Failed to decode indexer response: {error}"))?;
-
-    match response.message_type.as_str() {
-        "status" => {
-            let spans = serde_json::from_value::<Vec<IndexerSpan>>(
-                response
-                    .data
-                    .ok_or_else(|| "Indexer status response was missing span data".to_string())?,
-            )
-            .map_err(|error| format!("Failed to decode indexer status spans: {error}"))?;
-            Ok(Some(spans))
-        }
-        "subscriptionStatus" => Ok(None),
-        "subscriptionTerminated" => {
-            let termination = serde_json::from_value::<IndexerSubscriptionTerminatedPayload>(
-                response.data.ok_or_else(|| {
-                    "Indexer subscription termination was missing a payload".to_string()
-                })?,
-            )
-            .map_err(|decode_error| {
-                format!("Failed to decode subscription termination payload: {decode_error}")
-            })?;
-            Err(format!(
-                "Indexer terminated the status subscription ({}): {}",
-                termination.reason, termination.message
-            ))
-        }
-        "error" => {
-            let error = serde_json::from_value::<IndexerErrorPayload>(
-                response
-                    .data
-                    .ok_or_else(|| "Indexer error response was missing a payload".to_string())?,
-            )
-            .map_err(|decode_error| {
-                format!("Failed to decode indexer error response: {decode_error}")
-            })?;
-            let request_label = response
-                .id
-                .map(|id| format!("request #{id}"))
-                .unwrap_or_else(|| "request".to_string());
-            Err(format!(
-                "Indexer returned {} error {}: {}",
-                request_label, error.code, error.message
-            ))
-        }
-        _ => Ok(None),
-    }
 }
 
 #[cfg(test)]
@@ -556,47 +460,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_indexer_status_message_returns_spans_for_status() {
-        let spans = parse_indexer_status_message(
-            r#"{"id":2,"type":"status","data":[{"start":1,"end":8}]}"#,
-        )
-        .unwrap()
-        .unwrap();
+    fn latest_indexed_block_returns_highest_span_end() {
+        let details = IndexerDetails {
+            spans: vec![IndexerSpan { start: 1, end: 8 }, IndexerSpan { start: 20, end: 25 }],
+        };
 
-        assert_eq!(spans, vec![IndexerSpan { start: 1, end: 8 }]);
-    }
-
-    #[test]
-    fn parse_indexer_status_message_ignores_subscription_status() {
-        let result = parse_indexer_status_message(
-            r#"{"id":1,"type":"subscriptionStatus","data":{"action":"subscribed","target":{"type":"status"}}}"#,
-        )
-        .unwrap();
-
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn parse_indexer_status_message_surfaces_indexer_errors() {
-        let error = parse_indexer_status_message(
-            r#"{"id":2,"type":"error","data":{"code":"invalid_request","message":"missing field `id`"}}"#,
-        )
-        .unwrap_err();
-
-        assert!(error.contains("request #2"));
-        assert!(error.contains("invalid_request"));
-        assert!(error.contains("missing field `id`"));
-    }
-
-    #[test]
-    fn parse_indexer_status_message_surfaces_subscription_termination() {
-        let error = parse_indexer_status_message(
-            r#"{"type":"subscriptionTerminated","data":{"reason":"backpressure","message":"subscriber disconnected due to backpressure"}}"#,
-        )
-        .unwrap_err();
-
-        assert!(error.contains("backpressure"));
-        assert!(error.contains("subscriber disconnected due to backpressure"));
+        assert_eq!(details.latest_indexed_block(), Some(25));
     }
 }
 
