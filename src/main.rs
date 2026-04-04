@@ -7,7 +7,10 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use acuity_runtime::api;
 use accounts::load_account_store;
-use indexer_api::{EmptyPayload, IndexerEnvelope, IndexerErrorPayload, IndexerRequest, IndexerSpan};
+use indexer_api::{
+    EmptyPayload, IndexerEnvelope, IndexerErrorPayload, IndexerRequest, IndexerSpan,
+    IndexerSubscriptionTerminatedPayload,
+};
 use runtime_client::connect as connect_acuity_client;
 use views::{
     ChainStatus, CreateAccount, Home, IndexerStatus, IpfsStatus, ItemView, ManageAccounts, Navbar,
@@ -512,6 +515,20 @@ fn parse_indexer_status_message(payload: &str) -> Result<Option<Vec<IndexerSpan>
             Ok(Some(spans))
         }
         "subscriptionStatus" => Ok(None),
+        "subscriptionTerminated" => {
+            let termination = serde_json::from_value::<IndexerSubscriptionTerminatedPayload>(
+                response.data.ok_or_else(|| {
+                    "Indexer subscription termination was missing a payload".to_string()
+                })?,
+            )
+            .map_err(|decode_error| {
+                format!("Failed to decode subscription termination payload: {decode_error}")
+            })?;
+            Err(format!(
+                "Indexer terminated the status subscription ({}): {}",
+                termination.reason, termination.message
+            ))
+        }
         "error" => {
             let error = serde_json::from_value::<IndexerErrorPayload>(
                 response
@@ -569,6 +586,17 @@ mod tests {
         assert!(error.contains("request #2"));
         assert!(error.contains("invalid_request"));
         assert!(error.contains("missing field `id`"));
+    }
+
+    #[test]
+    fn parse_indexer_status_message_surfaces_subscription_termination() {
+        let error = parse_indexer_status_message(
+            r#"{"type":"subscriptionTerminated","data":{"reason":"backpressure","message":"subscriber disconnected due to backpressure"}}"#,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("backpressure"));
+        assert!(error.contains("subscriber disconnected due to backpressure"));
     }
 }
 

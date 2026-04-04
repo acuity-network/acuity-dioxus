@@ -28,17 +28,25 @@ pub struct GetEventsPayload {
     pub before: Option<EventCursor>,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum IndexerKey {
     Custom(IndexerCustomKey),
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct IndexerCustomKey {
     pub name: String,
     pub kind: String,
-    pub value: String,
+    pub value: IndexerScalarValue,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum IndexerScalarValue {
+    String(String),
+    U32(u32),
+    Bool(bool),
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
@@ -60,6 +68,13 @@ pub struct IndexerEnvelope {
 #[derive(Clone, Deserialize)]
 pub struct IndexerErrorPayload {
     pub code: String,
+    pub message: String,
+}
+
+#[derive(Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexerSubscriptionTerminatedPayload {
+    pub reason: String,
     pub message: String,
 }
 
@@ -112,7 +127,7 @@ mod tests {
                 key: IndexerKey::Custom(IndexerCustomKey {
                     name: "item_id".to_string(),
                     kind: "bytes32".to_string(),
-                    value: "0x12".to_string(),
+                    value: IndexerScalarValue::String("0x12".to_string()),
                 }),
                 limit: Some(25),
                 before: Some(EventCursor {
@@ -148,5 +163,22 @@ mod tests {
         assert_eq!(envelope.message_type, "error");
         assert_eq!(error.code, "invalid_request");
         assert_eq!(error.message, "missing field `id`");
+    }
+
+    #[test]
+    fn deserializes_bool_scalar_value() {
+        let key = serde_json::from_str::<IndexerKey>(
+            r#"{"type":"Custom","value":{"name":"published","kind":"bool","value":true}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            key,
+            IndexerKey::Custom(IndexerCustomKey {
+                name: "published".to_string(),
+                kind: "bool".to_string(),
+                value: IndexerScalarValue::Bool(true),
+            })
+        );
     }
 }

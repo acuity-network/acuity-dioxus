@@ -1,7 +1,7 @@
 use crate::{INDEXER_URL, IPFS_API_URL};
 use crate::indexer_api::{
     GetEventsPayload, IndexerCustomKey, IndexerDecodedEvent, IndexerEnvelope,
-    IndexerErrorPayload, IndexerEventsData, IndexerKey, IndexerRequest,
+    IndexerErrorPayload, IndexerEventsData, IndexerKey, IndexerRequest, IndexerScalarValue,
 };
 use base64::Engine;
 use futures::{SinkExt, StreamExt};
@@ -421,7 +421,7 @@ pub async fn fetch_events_for_item(
             key: IndexerKey::Custom(IndexerCustomKey {
                 name: "item_id".to_string(),
                 kind: "bytes32".to_string(),
-                value: item_id_hex,
+                value: IndexerScalarValue::String(item_id_hex),
             }),
             limit: None,
             before: None,
