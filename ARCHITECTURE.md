@@ -6,7 +6,7 @@
 
 ## Service Connections
 
-Three background async loops are spawned once in `App` (`src/main.rs`) via `use_hook` + `spawn`. Each loop feeds a `Signal<T>` that is provided globally via `use_context_provider`, making connection state available to every component.
+Three background async loops are spawned once in `App` (`src/main.rs`) via `use_hook` + `spawn`. Each loop feeds a `Signal<T>` that is provided globally via `use_context_provider`, making connection state available to every component. A shared `tokio::sync::watch` shutdown signal is created at launch and triggered from the desktop `Config::with_custom_event_handler` close event so all three loops can stop cleanly before the app exits.
 
 | Signal type | Service | Protocol | Default URL |
 |---|---|---|---|
@@ -14,13 +14,13 @@ Three background async loops are spawned once in `App` (`src/main.rs`) via `use_
 | `Signal<IpfsConnection>` | IPFS daemon | HTTP polling (`/api/v0/id`) | `http://127.0.0.1:5001` |
 | `Signal<IndexerConnection>` | Acuity indexer | `acuity-index-api-rs` over WebSocket | `ws://127.0.0.1:8172` |
 
-All three connections share the same lifecycle pattern: `Connecting → Connected → Reconnecting` (2 s delay), represented by the `ConnectionStatus` enum.
+All three connections share the same lifecycle pattern: `Connecting → Connected → Reconnecting` (2 s delay), represented by the `ConnectionStatus` enum. When shutdown is requested, each loop exits instead of entering another reconnect cycle.
 
-**Chain loop** (`watch_acuity_chain`): Reads chain constants (SS58 prefix, existential deposit, spec/tx version) on connect, then subscribes to both best-block and finalized-block streams concurrently via `tokio::select!`. Block numbers are exposed in the shared `Navbar` layout.
+**Chain loop** (`watch_acuity_chain`): Reads chain constants (SS58 prefix, existential deposit, spec/tx version) on connect, then subscribes to both best-block and finalized-block streams concurrently via `tokio::select!`. The stream loop also listens for the app shutdown signal so the Subxt websocket is dropped promptly on exit. Block numbers are exposed in the shared `Navbar` layout.
 
-**IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
+**IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. The polling request and sleep interval are both interruptible by the app shutdown signal so the task does not linger during exit. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
 
-**Indexer loop** (`watch_indexer`): Uses the published `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
+**Indexer loop** (`watch_indexer`): Uses the published `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. The subscription loop listens for the shared shutdown signal and then explicitly closes the websocket with `IndexerClient::close()` before exit. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
 
 ---
 
@@ -188,7 +188,7 @@ Accessed via the auto-generated `src/acuity_runtime.rs`:
 | `scrypt 0.11` | Password key derivation |
 | `crypto_secretbox 0.1.1` | XSalsa20-Poly1305 encryption |
 | `reqwest 0.12` | HTTP client for IPFS API |
-| `acuity-index-api-rs` | Shared indexer client used for status subscriptions and event queries |
+| `acuity-index-api-rs 0.1.1` | Shared indexer client used for status subscriptions and event queries |
 | `tokio-tungstenite 0.28` | WebSocket client for one-off IPFS queries |
 | `image 0.25` | Image decode and mipmap resize |
 | `rfd 0.15` | Native file picker dialog |

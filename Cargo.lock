@@ -36,13 +36,14 @@ dependencies = [
  "subxt-signer",
  "tokio",
  "tokio-tungstenite 0.28.0",
+ "tracing",
 ]
 
 [[package]]
 name = "acuity-index-api-rs"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f34442f43eaf8b0dd6864fd575dfe121a334f9c7dd91266128a4adb3b9a31c7c"
+checksum = "f3f004d22b8daa7405d69618c4525ef8149b76e983c6de609cf706e3e310ec01"
 dependencies = [
  "futures",
  "hex",

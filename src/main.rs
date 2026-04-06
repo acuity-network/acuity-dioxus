@@ -1,8 +1,11 @@
 use dioxus::prelude::*;
+#[cfg(feature = "desktop")]
+use dioxus::desktop::{Config as DesktopConfig, WindowEvent, tao::event::Event};
 use acuity_index_api_rs::{IndexerClient, Span as IndexerSpan};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
+use tokio::sync::watch;
 
 use acuity_runtime::api;
 use accounts::load_account_store;
@@ -18,6 +21,26 @@ const IPFS_DAEMON_ADDR: &str = "/ip4/127.0.0.1/tcp/5001";
 pub(crate) const IPFS_API_URL: &str = "http://127.0.0.1:5001";
 const RECONNECT_DELAY: Duration = Duration::from_secs(2);
 const IPFS_HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(5);
+
+#[derive(Clone)]
+struct AppShutdown {
+    tx: watch::Sender<bool>,
+}
+
+impl AppShutdown {
+    fn new() -> Self {
+        let (tx, _) = watch::channel(false);
+        Self { tx }
+    }
+
+    fn subscribe(&self) -> watch::Receiver<bool> {
+        self.tx.subscribe()
+    }
+
+    fn trigger(&self) {
+        let _ = self.tx.send(true);
+    }
+}
 
 #[derive(Clone, PartialEq)]
 pub(crate) struct ChainConnection {
@@ -239,6 +262,26 @@ const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 fn main() {
+    #[cfg(feature = "desktop")]
+    {
+        let shutdown = AppShutdown::new();
+        let shutdown_handler = shutdown.clone();
+        dioxus::LaunchBuilder::desktop()
+            .with_context(shutdown)
+            .with_cfg(DesktopConfig::new().with_custom_event_handler(move |event, _| {
+                if let Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } = event
+                {
+                    tracing::info!(target: "acuity_dioxus::shutdown", "received desktop close request");
+                    shutdown_handler.trigger();
+                }
+            }))
+            .launch(App);
+    }
+
+    #[cfg(not(feature = "desktop"))]
     dioxus::launch(App);
 }
 
@@ -248,32 +291,43 @@ fn App() -> Element {
     let indexer_connection = use_signal(IndexerConnection::default);
     let ipfs_connection = use_signal(IpfsConnection::default);
     let account_store = use_signal(load_account_store);
+    #[cfg(feature = "desktop")]
+    let shutdown = use_context::<AppShutdown>();
+
+    #[cfg(not(feature = "desktop"))]
+    let shutdown = use_hook(AppShutdown::new);
     use_context_provider(|| chain_connection);
     use_context_provider(|| indexer_connection);
     use_context_provider(|| ipfs_connection);
     use_context_provider(|| account_store);
 
+    let chain_shutdown = shutdown.clone();
     let _connection_task = use_hook(move || {
         let chain_connection = chain_connection;
+        let shutdown = chain_shutdown.subscribe();
 
         spawn(async move {
-            watch_acuity_chain(chain_connection).await;
+            watch_acuity_chain(chain_connection, shutdown).await;
         })
     });
 
+    let ipfs_shutdown = shutdown.clone();
     let _ipfs_connection_task = use_hook(move || {
         let ipfs_connection = ipfs_connection;
+        let shutdown = ipfs_shutdown.subscribe();
 
         spawn(async move {
-            watch_ipfs_daemon(ipfs_connection).await;
+            watch_ipfs_daemon(ipfs_connection, shutdown).await;
         })
     });
 
+    let indexer_shutdown = shutdown.clone();
     let _indexer_connection_task = use_hook(move || {
         let indexer_connection = indexer_connection;
+        let shutdown = indexer_shutdown.subscribe();
 
         spawn(async move {
-            watch_indexer(indexer_connection).await;
+            watch_indexer(indexer_connection, shutdown).await;
         })
     });
 
@@ -286,12 +340,20 @@ fn App() -> Element {
     }
 }
 
-async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
+async fn watch_acuity_chain(
+    mut chain_connection: Signal<ChainConnection>,
+    mut shutdown: watch::Receiver<bool>,
+) {
     loop {
+        if *shutdown.borrow() {
+            tracing::info!(target: "acuity_dioxus::shutdown", "shutting down chain connection watcher");
+            return;
+        }
+
         let details = chain_connection().details.clone();
         chain_connection.set(ChainConnection::connecting(details));
 
-        let result = stream_best_blocks(chain_connection).await;
+        let result = stream_best_blocks(chain_connection, shutdown.clone()).await;
 
         let error = match result {
             Ok(()) => "Block stream ended".to_string(),
@@ -300,11 +362,21 @@ async fn watch_acuity_chain(mut chain_connection: Signal<ChainConnection>) {
 
         let details = chain_connection().details.clone();
         chain_connection.set(ChainConnection::reconnecting(details, error));
-        tokio::time::sleep(RECONNECT_DELAY).await;
+
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "shutting down chain connection watcher");
+                return;
+            }
+            _ = tokio::time::sleep(RECONNECT_DELAY) => {}
+        }
     }
 }
 
-async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Result<(), String> {
+async fn stream_best_blocks(
+    mut chain_connection: Signal<ChainConnection>,
+    mut shutdown: watch::Receiver<bool>,
+) -> Result<(), String> {
     let client = connect_acuity_client().await?;
 
     let finalized_block = client
@@ -352,6 +424,10 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
 
     loop {
         tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "stopping chain block subscriptions");
+                return Ok(());
+            }
             next_best = best_blocks.next() => {
                 let block = match next_best {
                     Some(block) => block.map_err(|error| format!("Failed to read best block: {error}"))?,
@@ -389,14 +465,22 @@ async fn stream_best_blocks(mut chain_connection: Signal<ChainConnection>) -> Re
     }
 }
 
-async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {
+async fn watch_ipfs_daemon(
+    mut ipfs_connection: Signal<IpfsConnection>,
+    mut shutdown: watch::Receiver<bool>,
+) {
     let client = Client::new();
 
     loop {
+        if *shutdown.borrow() {
+            tracing::info!(target: "acuity_dioxus::shutdown", "shutting down IPFS connection watcher");
+            return;
+        }
+
         let details = ipfs_connection().details.clone();
         ipfs_connection.set(IpfsConnection::connecting(details));
 
-        let result = maintain_ipfs_connection(&client, ipfs_connection).await;
+        let result = maintain_ipfs_connection(&client, ipfs_connection, shutdown.clone()).await;
 
         let error = match result {
             Ok(()) => format!("Lost connection to {IPFS_DAEMON_ADDR}"),
@@ -405,16 +489,31 @@ async fn watch_ipfs_daemon(mut ipfs_connection: Signal<IpfsConnection>) {
 
         let details = ipfs_connection().details.clone();
         ipfs_connection.set(IpfsConnection::reconnecting(details, error));
-        tokio::time::sleep(RECONNECT_DELAY).await;
+
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "shutting down IPFS connection watcher");
+                return;
+            }
+            _ = tokio::time::sleep(RECONNECT_DELAY) => {}
+        }
     }
 }
 
-async fn watch_indexer(mut indexer_connection: Signal<IndexerConnection>) {
+async fn watch_indexer(
+    mut indexer_connection: Signal<IndexerConnection>,
+    mut shutdown: watch::Receiver<bool>,
+) {
     loop {
+        if *shutdown.borrow() {
+            tracing::info!(target: "acuity_dioxus::shutdown", "shutting down indexer connection watcher");
+            return;
+        }
+
         let details = indexer_connection().details.clone();
         indexer_connection.set(IndexerConnection::connecting(details));
 
-        let result = maintain_indexer_connection(indexer_connection).await;
+        let result = maintain_indexer_connection(indexer_connection, shutdown.clone()).await;
 
         let error = match result {
             Ok(()) => format!("Lost connection to {INDEXER_URL}"),
@@ -423,12 +522,20 @@ async fn watch_indexer(mut indexer_connection: Signal<IndexerConnection>) {
 
         let details = indexer_connection().details.clone();
         indexer_connection.set(IndexerConnection::reconnecting(details, error));
-        tokio::time::sleep(RECONNECT_DELAY).await;
+
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "shutting down indexer connection watcher");
+                return;
+            }
+            _ = tokio::time::sleep(RECONNECT_DELAY) => {}
+        }
     }
 }
 
 async fn maintain_indexer_connection(
     mut indexer_connection: Signal<IndexerConnection>,
+    mut shutdown: watch::Receiver<bool>,
 ) -> Result<(), String> {
     let client = IndexerClient::connect(INDEXER_URL)
         .await
@@ -445,12 +552,36 @@ async fn maintain_indexer_connection(
         .await
         .map_err(|error| format!("Failed to subscribe to indexer status: {error}"))?;
 
-    while let Some(update) = subscription.next().await {
-        let update = update.map_err(|error| format!("Failed to read indexer message: {error}"))?;
-        indexer_connection.set(IndexerConnection::connected(IndexerDetails {
-            spans: update.spans,
-        }));
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "closing indexer status subscription");
+                break;
+            }
+            update = subscription.next() => {
+                let Some(update) = update else {
+                    break;
+                };
+
+                let update = update.map_err(|error| format!("Failed to read indexer message: {error}"))?;
+                indexer_connection.set(IndexerConnection::connected(IndexerDetails {
+                    spans: update.spans,
+                }));
+            }
+        }
     }
+
+    subscription
+        .unsubscribe()
+        .await
+        .map_err(|error| format!("Failed to unsubscribe from indexer status: {error}"))?;
+    tracing::info!(target: "acuity_dioxus::shutdown", "unsubscribed from indexer status");
+
+    client
+        .close()
+        .await
+        .map_err(|error| format!("Failed to close indexer connection: {error}"))?;
+    tracing::info!(target: "acuity_dioxus::shutdown", "closed indexer websocket");
 
     Ok(())
 }
@@ -472,13 +603,17 @@ mod tests {
 async fn maintain_ipfs_connection(
     client: &Client,
     mut ipfs_connection: Signal<IpfsConnection>,
+    mut shutdown: watch::Receiver<bool>,
 ) -> Result<(), String> {
     loop {
-        let response = client
-            .post(format!("{IPFS_API_URL}/api/v0/id"))
-            .send()
-            .await
-            .map_err(|error| format!("Failed to reach {IPFS_DAEMON_ADDR}: {error}"))?;
+        let response = tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "stopping IPFS healthcheck loop");
+                return Ok(());
+            }
+            response = client.post(format!("{IPFS_API_URL}/api/v0/id")).send() => response,
+        }
+        .map_err(|error| format!("Failed to reach {IPFS_DAEMON_ADDR}: {error}"))?;
 
         let response = response
             .error_for_status()
@@ -503,6 +638,13 @@ async fn maintain_ipfs_connection(
             protocol_version: payload.protocol_version,
             protocols: payload.protocols,
         }));
-        tokio::time::sleep(IPFS_HEALTHCHECK_INTERVAL).await;
+
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!(target: "acuity_dioxus::shutdown", "stopping IPFS healthcheck loop");
+                return Ok(());
+            }
+            _ = tokio::time::sleep(IPFS_HEALTHCHECK_INTERVAL) => {}
+        }
     }
 }

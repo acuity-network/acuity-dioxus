@@ -7,7 +7,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-acuity-index-api-rs = "*"
+acuity-index-api-rs = "0.1.1"
 bs58 = "0.5"
 dioxus = { version = "0.7.1", features = ["router"] }
 fast_qr = { version = "0.12", features = ["svg"] }
@@ -31,6 +31,7 @@ subxt = { version = "0.50.0", features = ["native"] }
 subxt-signer = { version = "0.50.0", default-features = false, features = ["polkadot-js-compat", "subxt"] }
 tokio = { version = "1", features = ["time"] }
 tokio-tungstenite = "0.28"
+tracing = "0.1"
 
 [features]
 default = ["desktop"]

@@ -17,12 +17,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a full description of the module stru
 | Acuity node | Listening at `ws://127.0.0.1:9944` |
 | IPFS daemon | API at `http://127.0.0.1:5001` |
 | Acuity indexer | WebSocket at `ws://127.0.0.1:8172` |
-| `acuity-index-api-rs` | Crates.io dependency used as the indexer client |
+| `acuity-index-api-rs 0.1.1` | Crates.io dependency used as the indexer client |
 
 The app starts and reconnects gracefully even if services are unavailable, but publishing and browsing content requires all three.
 
 The dapp uses the published `acuity-index-api-rs` crate as its indexer client instead of implementing the indexer websocket protocol directly in this repository.
 Event loading now uses the crate's typed `DecodedEvent` and `StoredEvent` helpers directly rather than reparsing raw JSON event payloads inside the app.
+The long-lived indexer websocket is explicitly closed with `IndexerClient::close()` when its subscription loop exits.
 
 ---
 
