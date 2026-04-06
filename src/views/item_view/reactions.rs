@@ -137,7 +137,10 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let reaction_insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = reaction_fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // Load reactions whenever item_id, revision_id, or reload_tick changes.
@@ -322,6 +325,7 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                 InsufficientFundsHint {
                     balance: chain_connection().details.active_account_balance,
                     fee: reaction_fee_estimate().flatten(),
+                    fee_state: reaction_fee_estimate.state()(),
                 }
             }
 

@@ -2,6 +2,7 @@ use crate::{
     content::{preview_data_url_for_path, SelectedImage},
     Route,
 };
+use dioxus::hooks::UseResourceState;
 use dioxus::html::HasFileData;
 use dioxus::prelude::*;
 use rfd::FileDialog;
@@ -43,18 +44,25 @@ pub fn format_balance(raw: u128, fmt: &TokenFormat) -> String {
     }
 }
 
-/// Renders an "insufficient funds" hint paragraph below a transaction button.
+/// Renders a hint paragraph below a transaction button indicating fee status.
 ///
 /// Pass:
-/// - `balance` — the active account's current free balance (planck), or `None`
+/// - `balance`   — the active account's current free balance (planck), or `None`
 ///   if not yet fetched.
-/// - `fee`     — the estimated transaction fee (planck), or `None` if not yet
-///   estimated.
+/// - `fee`       — the estimated transaction fee (planck), or `None` if the
+///   estimate is pending or failed.
+/// - `fee_state` — the `UseResourceState` of the fee estimation resource, used
+///   to distinguish "still loading" from "estimation failed".
 ///
-/// Nothing is rendered while either value is loading, or when funds are
-/// sufficient.
+/// Shows "Checking fees..." while loading, "Could not estimate fee." if the
+/// estimate failed, "Insufficient funds…" when balance < fee, and nothing
+/// when funds are sufficient.
 #[component]
-pub fn InsufficientFundsHint(balance: Option<u128>, fee: Option<u128>) -> Element {
+pub fn InsufficientFundsHint(
+    balance: Option<u128>,
+    fee: Option<u128>,
+    fee_state: UseResourceState,
+) -> Element {
     let fmt = TokenFormat::default();
     match (balance, fee) {
         (Some(b), Some(f)) if b < f => rsx! {
@@ -63,7 +71,19 @@ pub fn InsufficientFundsHint(balance: Option<u128>, fee: Option<u128>) -> Elemen
                 "Insufficient funds — need {format_balance(f, &fmt)} but balance is {format_balance(b, &fmt)}."
             }
         },
-        _ => rsx! {},
+        (Some(_), Some(_)) => rsx! {}, // sufficient funds — no hint needed
+        _ if fee_state == UseResourceState::Pending => rsx! {
+            p {
+                class: "save-locked-hint save-locked-hint--checking",
+                "Checking fees..."
+            }
+        },
+        _ => rsx! {
+            p {
+                class: "save-locked-hint",
+                "Could not estimate fee."
+            }
+        },
     }
 }
 

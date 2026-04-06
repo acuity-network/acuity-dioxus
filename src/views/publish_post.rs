@@ -111,7 +111,10 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
     let insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // Single smart status bar: error > saving > notice
@@ -267,6 +270,7 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
                         InsufficientFundsHint {
                             balance: chain_connection().details.active_account_balance,
                             fee: fee_estimate().flatten(),
+                            fee_state: fee_estimate.state()(),
                         }
                     }
                 }

@@ -150,7 +150,10 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let edit_insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = edit_fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // Fee estimation for "Post comment" (publish_item with parent).
@@ -175,7 +178,10 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let comment_insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = comment_fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // Top-level comment submit handler (reply to the item itself).
@@ -566,6 +572,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                                     InsufficientFundsHint {
                                         balance: chain_connection().details.active_account_balance,
                                         fee: comment_fee_estimate().flatten(),
+                                        fee_state: comment_fee_estimate.state()(),
                                     }
                                 }
                             }
@@ -706,6 +713,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                             InsufficientFundsHint {
                                 balance: chain_connection().details.active_account_balance,
                                 fee: edit_fee_estimate().flatten(),
+                                fee_state: edit_fee_estimate.state()(),
                             }
                         }
                     }

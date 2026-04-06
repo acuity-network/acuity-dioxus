@@ -1,4 +1,5 @@
 use crate::{acuity_runtime::api, ACUITY_NODE_URL};
+use parity_scale_codec::{Compact, Decode, Encode};
 use subxt::{OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::Keypair as SignerKeypair;
 
@@ -61,14 +62,40 @@ where
         .await
         .map_err(|e| format!("Failed to get latest block for fee estimation: {e}"))?;
 
-    let signed = at
+    // Use offline signing (nonce defaults to 0) — the nonce has no effect on
+    // fee calculation, and skipping the nonce RPC avoids a failure for new
+    // accounts that have never submitted a transaction.
+    let mut signable = at
         .tx()
-        .create_signed(call, signer, Default::default())
-        .await
-        .map_err(|e| format!("Failed to build signed transaction for fee estimation: {e}"))?;
+        .create_signable_offline(call, Default::default())
+        .map_err(|e| format!("Failed to build signable transaction for fee estimation: {e}"))?;
 
-    signed
-        .partial_fee_estimate()
+    let signed = signable
+        .sign(signer)
+        .map_err(|e| format!("Failed to sign transaction for fee estimation: {e}"))?;
+
+    // Call TransactionPaymentApi_query_info via call_raw, decoding the response
+    // as (Compact<u64>, Compact<u64>, u8, u64) — Acuity's RuntimeDispatchInfo
+    // uses u64 for partial_fee, not u128 as assumed by partial_fee_estimate().
+    let encoded_tx = signed.encoded();
+    let mut params = encoded_tx.to_vec();
+    (encoded_tx.len() as u32).encode_to(&mut params);
+
+    let response = at
+        .runtime_apis()
+        .call_raw("TransactionPaymentApi_query_info", Some(&params))
         .await
-        .map_err(|e| format!("Fee estimation failed: {e}"))
+        .map_err(|e| {
+            let msg = format!("Fee estimation failed: {e}");
+            tracing::warn!("{msg}");
+            msg
+        })?;
+
+    // data layout: { weight: { ref_time: Compact<u64>, proof_size: Compact<u64> },
+    //                class: u8, partial_fee: u64 }
+    let (_, _, _, partial_fee) =
+        <(Compact<u64>, Compact<u64>, u8, u64)>::decode(&mut response.as_ref())
+            .map_err(|e| format!("Failed to decode fee info: {e}"))?;
+
+    Ok(partial_fee as u128)
 }

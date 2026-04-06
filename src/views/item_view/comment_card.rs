@@ -99,7 +99,10 @@ pub fn CommentCard(
     let reply_insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = reply_fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // Fee for saving an edit (publish_revision for this comment).
@@ -118,7 +121,10 @@ pub fn CommentCard(
     let edit_insufficient_funds = use_memo(move || {
         let balance = chain_connection().details.active_account_balance;
         let fee = edit_fee_estimate().flatten();
-        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+        match (balance, fee) {
+            (Some(b), Some(f)) => b < f,
+            _ => true, // block until both balance and fee are known
+        }
     });
 
     // ── Submit handlers ───────────────────────────────────────────────────────
@@ -321,6 +327,7 @@ pub fn CommentCard(
                         InsufficientFundsHint {
                             balance: chain_connection().details.active_account_balance,
                             fee: edit_fee_estimate().flatten(),
+                            fee_state: edit_fee_estimate.state()(),
                         }
                     }
                 }
@@ -350,6 +357,7 @@ pub fn CommentCard(
                         InsufficientFundsHint {
                             balance: chain_connection().details.active_account_balance,
                             fee: reply_fee_estimate().flatten(),
+                            fee_state: reply_fee_estimate.state()(),
                         }
                     }
                 }
