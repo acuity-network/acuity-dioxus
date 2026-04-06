@@ -6,6 +6,67 @@ use dioxus::html::HasFileData;
 use dioxus::prelude::*;
 use rfd::FileDialog;
 
+// ── Balance / fee helpers ─────────────────────────────────────────────────────
+
+/// Token display format: decimal places and unit symbol.
+/// Defaults to 12 decimals and "UNIT" to match the Acuity chain constants.
+#[derive(Clone, PartialEq)]
+pub struct TokenFormat {
+    pub decimals: u8,
+    pub symbol: String,
+}
+
+impl Default for TokenFormat {
+    fn default() -> Self {
+        Self {
+            decimals: 12,
+            symbol: "UNIT".to_string(),
+        }
+    }
+}
+
+/// Formats a raw planck value as a human-readable token string.
+pub fn format_balance(raw: u128, fmt: &TokenFormat) -> String {
+    if fmt.decimals == 0 {
+        return format!("{} {}", raw, fmt.symbol);
+    }
+    let divisor = 10u128.pow(fmt.decimals as u32);
+    let whole = raw / divisor;
+    let frac = raw % divisor;
+    let frac_str = format!("{:0>width$}", frac, width = fmt.decimals as usize);
+    let trimmed = frac_str.trim_end_matches('0');
+    if trimmed.is_empty() {
+        format!("{} {}", whole, fmt.symbol)
+    } else {
+        let display = &trimmed[..trimmed.len().min(4)];
+        format!("{}.{} {}", whole, display, fmt.symbol)
+    }
+}
+
+/// Renders an "insufficient funds" hint paragraph below a transaction button.
+///
+/// Pass:
+/// - `balance` — the active account's current free balance (planck), or `None`
+///   if not yet fetched.
+/// - `fee`     — the estimated transaction fee (planck), or `None` if not yet
+///   estimated.
+///
+/// Nothing is rendered while either value is loading, or when funds are
+/// sufficient.
+#[component]
+pub fn InsufficientFundsHint(balance: Option<u128>, fee: Option<u128>) -> Element {
+    let fmt = TokenFormat::default();
+    match (balance, fee) {
+        (Some(b), Some(f)) if b < f => rsx! {
+            p {
+                class: "save-locked-hint",
+                "Insufficient funds — need {format_balance(f, &fmt)} but balance is {format_balance(b, &fmt)}."
+            }
+        },
+        _ => rsx! {},
+    }
+}
+
 // ── ImageDropZone ─────────────────────────────────────────────────────────────
 
 /// A drag-and-drop / click-to-pick image zone.

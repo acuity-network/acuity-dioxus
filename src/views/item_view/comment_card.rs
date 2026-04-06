@@ -1,5 +1,6 @@
 use crate::{
     accounts::AccountStore,
+    acuity_runtime::api,
     comment::{
         load_comment_revision_history, publish_comment, publish_comment_revision, CommentDraft,
         LoadedComment, PublishCommentRequest,
@@ -8,10 +9,13 @@ use crate::{
         decode_single_mixin, fetch_ipfs_digest_bytes, BodyTextMixinMessage, ItemMessage,
         RevisionEntry, BODY_TEXT_MIXIN_ID,
     },
+    runtime_client::estimate_fee,
+    ChainConnection,
 };
 use dioxus::prelude::*;
 
 use super::reactions::Reactions;
+use crate::views::components::InsufficientFundsHint;
 
 /// Recursive component that renders one comment and all its nested children.
 #[component]
@@ -23,6 +27,8 @@ pub fn CommentCard(
     mut reload_tick: Signal<u64>,
     account_store: Signal<AccountStore>,
 ) -> Element {
+    let chain_connection = use_context::<Signal<ChainConnection>>();
+
     // ── Reply state ───────────────────────────────────────────────────────────
     let mut reply_open = use_signal(|| false);
     let mut reply_body: Signal<String> = use_signal(String::new);
@@ -69,6 +75,51 @@ pub fn CommentCard(
             .unwrap_or(false)
     };
     let can_edit = is_owner && comment.is_revisionable;
+
+    // ── Fee estimation ────────────────────────────────────────────────────────
+
+    // Fee for posting a reply (publish_item with this comment as parent).
+    let reply_fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let dummy_nonce = [0u8; 32];
+        let dummy_ipfs_hash = [0u8; 32];
+        let call = api::tx().content().publish_item(
+            api::runtime_types::pallet_content::Nonce(dummy_nonce),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![
+                api::runtime_types::pallet_content::pallet::ItemId(parent_item_id),
+            ]),
+            0x01,
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+        );
+        estimate_fee(&call, &signer).await.ok()
+    });
+
+    let reply_insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = reply_fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
+
+    // Fee for saving an edit (publish_revision for this comment).
+    let edit_fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let dummy_ipfs_hash = [0u8; 32];
+        let call = api::tx().content().publish_revision(
+            api::runtime_types::pallet_content::pallet::ItemId(comment_item_id),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+        );
+        estimate_fee(&call, &signer).await.ok()
+    });
+
+    let edit_insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = edit_fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
 
     // ── Submit handlers ───────────────────────────────────────────────────────
     let submit_reply = {
@@ -263,9 +314,13 @@ pub fn CommentCard(
                     div { class: "comment-edit-actions",
                         button {
                             class: "btn-primary",
-                            disabled: edit_submitting() || edit_body().trim().is_empty(),
+                            disabled: edit_submitting() || edit_body().trim().is_empty() || edit_insufficient_funds(),
                             onclick: submit_edit,
                             if edit_submitting() { "Saving…" } else { "Save" }
+                        }
+                        InsufficientFundsHint {
+                            balance: chain_connection().details.active_account_balance,
+                            fee: edit_fee_estimate().flatten(),
                         }
                     }
                 }
@@ -288,9 +343,13 @@ pub fn CommentCard(
                     div { class: "comment-reply-actions",
                         button {
                             class: "btn-primary",
-                            disabled: reply_submitting() || reply_body().trim().is_empty(),
+                            disabled: reply_submitting() || reply_body().trim().is_empty() || reply_insufficient_funds(),
                             onclick: submit_reply,
                             if reply_submitting() { "Posting…" } else { "Post reply" }
+                        }
+                        InsufficientFundsHint {
+                            balance: chain_connection().details.active_account_balance,
+                            fee: reply_fee_estimate().flatten(),
                         }
                     }
                 }

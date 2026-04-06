@@ -1,13 +1,16 @@
 use crate::{
     accounts::AccountStore,
+    acuity_runtime::api,
     content::{short_hex, SelectedImage},
     profile::{load_profile_for_account, save_profile, ProfileDraft, SaveProfileRequest},
+    runtime_client::estimate_fee,
+    ChainConnection,
     Route,
 };
 use dioxus::prelude::*;
 
 use super::helpers::{account_type_label, apply_loaded_profile};
-use crate::views::components::ImageDropZone;
+use crate::views::components::{ImageDropZone, InsufficientFundsHint};
 
 const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 
@@ -15,6 +18,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 pub fn ProfileEdit() -> Element {
     let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -43,6 +47,54 @@ pub fn ProfileEdit() -> Element {
         account_store()
             .active_account()
             .map(|a| a.address.clone())
+    });
+
+    // Fee estimation — re-runs when the signer or the profile state changes
+    // (first-time creation needs a batch call; updates use publish_revision).
+    let fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let is_first_save = current_item_id().is_none();
+        if is_first_save {
+            // Estimate batch_all([publish_item, set_profile]) — use zero-filled
+            // dummy data; the fee depends on call structure, not payload content.
+            let dummy_nonce = [0u8; 32];
+            let dummy_item_id = [0u8; 32];
+            let dummy_ipfs_hash = [0u8; 32];
+            let publish_call = api::Call::Content(
+                api::runtime_types::pallet_content::pallet::Call::publish_item {
+                    nonce: api::runtime_types::pallet_content::Nonce(dummy_nonce),
+                    parents: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                    flags: 0x01,
+                    links: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                    mentions: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                    ipfs_hash: api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+                },
+            );
+            let set_profile_call = api::Call::AccountProfile(
+                api::runtime_types::pallet_account_profile::pallet::Call::set_profile {
+                    item_id: api::runtime_types::pallet_content::pallet::ItemId(dummy_item_id),
+                },
+            );
+            let batch_call = api::tx().utility().batch_all(vec![publish_call, set_profile_call]);
+            estimate_fee(&batch_call, &signer).await.ok()
+        } else {
+            // Estimate publish_revision with dummy item/hash.
+            let dummy_item_id = current_item_id().unwrap_or([0u8; 32]);
+            let dummy_ipfs_hash = [0u8; 32];
+            let revision_call = api::tx().content().publish_revision(
+                api::runtime_types::pallet_content::pallet::ItemId(dummy_item_id),
+                api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+            );
+            estimate_fee(&revision_call, &signer).await.ok()
+        }
+    });
+
+    let insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
     });
 
     use_effect(move || {
@@ -223,7 +275,7 @@ pub fn ProfileEdit() -> Element {
                 div { class: "form-actions",
                     button {
                         class: "btn-primary",
-                        disabled: is_loading() || is_saving() || !has_active_account || !is_unlocked,
+                        disabled: is_loading() || is_saving() || !has_active_account || !is_unlocked || insufficient_funds(),
                         onclick: {
                             let store_snap = account_store();
                             let req = SaveProfileRequest {
@@ -276,6 +328,12 @@ pub fn ProfileEdit() -> Element {
                 if has_active_account && !is_unlocked {
                     p { class: "save-locked-hint",
                         "Unlock the account from the sidebar to save."
+                    }
+                }
+                if has_active_account && is_unlocked {
+                    InsufficientFundsHint {
+                        balance: chain_connection().details.active_account_balance,
+                        fee: fee_estimate().flatten(),
                     }
                 }
 

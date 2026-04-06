@@ -1,13 +1,15 @@
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
-    runtime_client::connect as connect_acuity_client,
+    runtime_client::{connect as connect_acuity_client, estimate_fee},
+    ChainConnection,
 };
 use dioxus::prelude::*;
 use sp_core::crypto::Ss58Codec;
 use std::collections::HashMap;
 
 use super::types::{AVAILABLE_EMOJI_CODEPOINTS, ReactionSummary};
+use crate::views::components::InsufficientFundsHint;
 
 /// Fetches all reactions for a given `(item_id, revision_id)` by iterating
 /// the `ContentReactions::ItemAccountReactions` storage map with a 2-key
@@ -109,6 +111,7 @@ pub async fn fetch_reactions(
 #[component]
 pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
 
     let mut reactions: Signal<Vec<ReactionSummary>> = use_signal(Vec::new);
     let mut reactions_loading = use_signal(|| false);
@@ -117,6 +120,25 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let mut is_submitting = use_signal(|| false);
     let mut tx_error: Signal<Option<String>> = use_signal(|| None);
     let mut reload_tick = use_signal(|| 0_u64);
+
+    // Fee estimation for add_reaction (representative cost for all reaction txs).
+    let reaction_fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        // Use a dummy emoji codepoint (0x1F44D = 👍) for the estimate.
+        let dummy_emoji = api::runtime_types::pallet_content_reactions::pallet::Emoji(0x1F44D);
+        let call = api::tx().content_reactions().add_reaction(
+            api::runtime_types::pallet_content::pallet::ItemId(item_id),
+            revision_id(),
+            dummy_emoji,
+        );
+        estimate_fee(&call, &signer).await.ok()
+    });
+
+    let reaction_insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = reaction_fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
 
     // Load reactions whenever item_id, revision_id, or reload_tick changes.
     use_effect(move || {
@@ -262,7 +284,7 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                             button {
                                 class: chip_class,
                                 title: "{tooltip}",
-                                disabled: is_submitting(),
+                                disabled: is_submitting() || reaction_insufficient_funds(),
                                 onclick: move |_| submit_tx(cp, removing),
                                 "{reaction.emoji_char} {reaction.count}"
                             }
@@ -274,7 +296,7 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                 if is_unlocked && !picker_emojis.is_empty() {
                     button {
                         class: "reaction-add",
-                        disabled: is_submitting(),
+                        disabled: is_submitting() || reaction_insufficient_funds(),
                         onclick: move |_| show_picker.with_mut(|v| *v = !*v),
                         "+"
                     }
@@ -288,11 +310,18 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                     for (cp, ch) in picker_emojis {
                         button {
                             class: "picker-emoji",
-                            disabled: is_submitting(),
+                            disabled: is_submitting() || reaction_insufficient_funds(),
                             onclick: move |_| submit_tx(cp, false),
                             "{ch}"
                         }
                     }
+                }
+            }
+
+            if reaction_insufficient_funds() {
+                InsufficientFundsHint {
+                    balance: chain_connection().details.active_account_balance,
+                    fee: reaction_fee_estimate().flatten(),
                 }
             }
 

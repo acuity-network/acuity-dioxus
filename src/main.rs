@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 #[cfg(feature = "desktop")]
 use dioxus::desktop::{Config as DesktopConfig, WindowEvent, tao::event::Event};
-use acuity_index_api_rs::{IndexerClient, Span as IndexerSpan};
+use acuity_index_api_rs::{Bytes32, CustomKey, CustomValue, IndexerClient, Key, Span as IndexerSpan};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
@@ -60,6 +60,9 @@ pub(crate) struct ChainDetails {
     pub(crate) existential_deposit: Option<String>,
     pub(crate) spec_version: Option<u32>,
     pub(crate) transaction_version: Option<u32>,
+    /// Free balance (planck) of the currently active account, or `None` if
+    /// no account is selected / balance hasn't been fetched yet.
+    pub(crate) active_account_balance: Option<u128>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -301,6 +304,27 @@ fn App() -> Element {
     use_context_provider(|| ipfs_connection);
     use_context_provider(|| account_store);
 
+    // Channel that publishes the active account address whenever it changes.
+    // The balance watcher task uses this to know which account to subscribe to.
+    let (active_address_tx, active_address_rx) = use_hook(|| {
+        let initial = account_store()
+            .active_account()
+            .map(|a| a.address.clone());
+        watch::channel(initial)
+    });
+
+    // Whenever the active account changes, push the new address to the watchers.
+    use_effect(move || {
+        let addr = account_store().active_account().map(|a| a.address.clone());
+        let _ = active_address_tx.send(addr);
+    });
+
+    // Channel that shares the live IndexerClient so the balance watcher can
+    // call subscribe_events on the same underlying WebSocket connection.
+    let (indexer_client_tx, indexer_client_rx) = use_hook(|| {
+        watch::channel::<Option<IndexerClient>>(None)
+    });
+
     let chain_shutdown = shutdown.clone();
     let _connection_task = use_hook(move || {
         let chain_connection = chain_connection;
@@ -327,7 +351,23 @@ fn App() -> Element {
         let shutdown = indexer_shutdown.subscribe();
 
         spawn(async move {
-            watch_indexer(indexer_connection, shutdown).await;
+            watch_indexer(indexer_connection, indexer_client_tx, shutdown).await;
+        })
+    });
+
+    let balance_shutdown = shutdown.clone();
+    let _balance_task = use_hook(move || {
+        let active_address_rx = active_address_rx;
+        let shutdown = balance_shutdown.subscribe();
+
+        spawn(async move {
+            watch_active_account_balance(
+                chain_connection,
+                active_address_rx,
+                indexer_client_rx,
+                shutdown,
+            )
+            .await;
         })
     });
 
@@ -502,6 +542,7 @@ async fn watch_ipfs_daemon(
 
 async fn watch_indexer(
     mut indexer_connection: Signal<IndexerConnection>,
+    indexer_client_tx: watch::Sender<Option<IndexerClient>>,
     mut shutdown: watch::Receiver<bool>,
 ) {
     loop {
@@ -513,7 +554,15 @@ async fn watch_indexer(
         let details = indexer_connection().details.clone();
         indexer_connection.set(IndexerConnection::connecting(details));
 
-        let result = maintain_indexer_connection(indexer_connection, shutdown.clone()).await;
+        let result = maintain_indexer_connection(
+            indexer_connection,
+            &indexer_client_tx,
+            shutdown.clone(),
+        )
+        .await;
+
+        // Signal to the balance watcher that the indexer is no longer connected.
+        let _ = indexer_client_tx.send(None);
 
         let error = match result {
             Ok(()) => format!("Lost connection to {INDEXER_URL}"),
@@ -535,6 +584,7 @@ async fn watch_indexer(
 
 async fn maintain_indexer_connection(
     mut indexer_connection: Signal<IndexerConnection>,
+    indexer_client_tx: &watch::Sender<Option<IndexerClient>>,
     mut shutdown: watch::Receiver<bool>,
 ) -> Result<(), String> {
     let client = IndexerClient::connect(INDEXER_URL)
@@ -546,6 +596,9 @@ async fn maintain_indexer_connection(
         .map_err(|error| format!("Failed to request indexer status snapshot: {error}"))?;
 
     indexer_connection.set(IndexerConnection::connected(IndexerDetails { spans }));
+
+    // Share the live client with the balance watcher task.
+    let _ = indexer_client_tx.send(Some(client.clone()));
 
     let mut subscription = client
         .subscribe_status()
@@ -584,6 +637,191 @@ async fn maintain_indexer_connection(
     tracing::info!(target: "acuity_dioxus::shutdown", "closed indexer websocket");
 
     Ok(())
+}
+
+/// Watches for account-tagged indexer events and re-fetches the active
+/// account's balance whenever one arrives.
+///
+/// This replaces the previous approach of re-fetching on every finalised
+/// block: instead the indexer's `subscribe_events` with `Key::Custom {
+/// name: "account_id" }` fires only when an event that touches the account
+/// has been indexed, so balance queries are driven by actual on-chain
+/// activity.
+async fn watch_active_account_balance(
+    mut chain_connection: Signal<ChainConnection>,
+    mut active_address_rx: watch::Receiver<Option<String>>,
+    mut indexer_client_rx: watch::Receiver<Option<IndexerClient>>,
+    mut shutdown: watch::Receiver<bool>,
+) {
+    loop {
+        // ── Wait for a non-None active account address ──────────────────────
+        let address = loop {
+            let addr = active_address_rx.borrow_and_update().clone();
+            if let Some(a) = addr {
+                break a;
+            }
+            // No active account — clear the balance and wait.
+            chain_connection.with_mut(|c| c.details.active_account_balance = None);
+            tokio::select! {
+                _ = shutdown.changed() => return,
+                _ = active_address_rx.changed() => {}
+            }
+        };
+
+        // Decode the SS58 address to raw bytes for the indexer key.
+        let raw_bytes = match decode_ss58_bytes(&address) {
+            Some(b) => b,
+            None => {
+                tracing::warn!(
+                    target: "acuity_dioxus::balance",
+                    "Could not decode active account address '{address}' as SS58; skipping balance watch"
+                );
+                tokio::select! {
+                    _ = shutdown.changed() => return,
+                    _ = active_address_rx.changed() => {}
+                }
+                continue;
+            }
+        };
+
+        // ── Initial balance fetch via Subxt ──────────────────────────────────
+        match connect_acuity_client().await {
+            Ok(client) => {
+                match runtime_client::fetch_account_balance(&client, &address).await {
+                    Ok(balance) => chain_connection
+                        .with_mut(|c| c.details.active_account_balance = Some(balance)),
+                    Err(error) => tracing::warn!(
+                        target: "acuity_dioxus::balance",
+                        "Initial balance fetch failed for {address}: {error}"
+                    ),
+                }
+            }
+            Err(error) => tracing::warn!(
+                target: "acuity_dioxus::balance",
+                "Could not connect to node for initial balance fetch: {error}"
+            ),
+        }
+
+        // ── Wait for a live IndexerClient ────────────────────────────────────
+        let indexer_client = {
+            let mut result: Option<IndexerClient> = None;
+            loop {
+                let client = indexer_client_rx.borrow_and_update().clone();
+                if let Some(c) = client {
+                    result = Some(c);
+                    break;
+                }
+                tokio::select! {
+                    _ = shutdown.changed() => return,
+                    _ = active_address_rx.changed() => {
+                        // Address changed while waiting for indexer — restart outer loop.
+                        break;
+                    }
+                    _ = indexer_client_rx.changed() => {}
+                }
+            }
+            match result {
+                Some(c) => c,
+                None => continue, // active address changed; re-enter outer loop
+            }
+        };
+
+        // ── Subscribe to account-tagged events ──────────────────────────────
+        let key = Key::Custom(CustomKey {
+            name: "account_id".to_string(),
+            value: CustomValue::Bytes32(Bytes32(raw_bytes)),
+        });
+
+        let mut sub = match indexer_client.subscribe_events(key).await {
+            Ok(s) => s,
+            Err(error) => {
+                tracing::warn!(
+                    target: "acuity_dioxus::balance",
+                    "Failed to subscribe to account events for {address}: {error}"
+                );
+                tokio::select! {
+                    _ = shutdown.changed() => return,
+                    _ = active_address_rx.changed() => {}
+                    _ = indexer_client_rx.changed() => {}
+                }
+                continue;
+            }
+        };
+
+        tracing::info!(
+            target: "acuity_dioxus::balance",
+            "Subscribed to account events for {address}"
+        );
+
+        // ── Inner event loop ─────────────────────────────────────────────────
+        loop {
+            tokio::select! {
+                _ = shutdown.changed() => {
+                    tracing::info!(
+                        target: "acuity_dioxus::balance",
+                        "shutting down balance watcher"
+                    );
+                    let _ = sub.unsubscribe().await;
+                    return;
+                }
+                _ = active_address_rx.changed() => {
+                    // Active account switched — resubscribe for the new address.
+                    let _ = sub.unsubscribe().await;
+                    break;
+                }
+                _ = indexer_client_rx.changed() => {
+                    // Indexer reconnected — resubscribe on the new client.
+                    let _ = sub.unsubscribe().await;
+                    break;
+                }
+                notification = sub.next() => {
+                    match notification {
+                        None => {
+                            // Subscription stream ended (indexer disconnected).
+                            tracing::warn!(
+                                target: "acuity_dioxus::balance",
+                                "Account event subscription ended for {address}; will resubscribe"
+                            );
+                            break;
+                        }
+                        Some(Err(error)) => {
+                            tracing::warn!(
+                                target: "acuity_dioxus::balance",
+                                "Account event subscription error for {address}: {error}"
+                            );
+                            break;
+                        }
+                        Some(Ok(_)) => {
+                            // An event touching this account was indexed — re-fetch balance.
+                            match connect_acuity_client().await {
+                                Ok(client) => {
+                                    match runtime_client::fetch_account_balance(&client, &address).await {
+                                        Ok(balance) => chain_connection.with_mut(|c| {
+                                            c.details.active_account_balance = Some(balance);
+                                        }),
+                                        Err(error) => tracing::warn!(
+                                            target: "acuity_dioxus::balance",
+                                            "Balance re-fetch failed for {address}: {error}"
+                                        ),
+                                    }
+                                }
+                                Err(error) => tracing::warn!(
+                                    target: "acuity_dioxus::balance",
+                                    "Could not connect for balance re-fetch: {error}"
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Decodes an SS58-encoded address to its raw 32-byte public key.
+fn decode_ss58_bytes(address: &str) -> Option<[u8; 32]> {
+    use sp_core::{crypto::Ss58Codec, sr25519::Public};
+    Public::from_ss58check(address).ok().map(|p| p.0)
 }
 
 #[cfg(test)]

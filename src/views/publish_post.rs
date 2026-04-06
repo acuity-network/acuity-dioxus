@@ -1,16 +1,19 @@
 use crate::{
     accounts::AccountStore,
+    acuity_runtime::api,
     content::{
         bytes32_to_hex, decode_single_mixin, fetch_ipfs_digest_bytes, fetch_latest_revision_hash,
         ItemMessage, SelectedImage, TitleMixinMessage, TITLE_MIXIN_ID,
     },
     post::{publish_post, PostDraft, PublishPostRequest},
+    runtime_client::estimate_fee,
+    ChainConnection,
     Route,
 };
 use dioxus::prelude::*;
 use prost::Message;
 
-use super::components::{EmptyState, ImageDropZone};
+use super::components::{EmptyState, ImageDropZone, InsufficientFundsHint};
 
 const PUBLISH_POST_CSS: Asset = asset!("/assets/styling/publish_post.css");
 const PUBLISH_FEED_CSS: Asset = asset!("/assets/styling/publish_feed.css");
@@ -42,6 +45,7 @@ async fn load_feed_context(encoded_feed_id: &str) -> Result<([u8; 32], String), 
 pub fn PublishPost(encoded_feed_id: String) -> Element {
     let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -83,6 +87,32 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
     let has_active_account = active_account.is_some();
     let title_empty = draft().title.trim().is_empty();
     let feed_ready = feed_item_id().is_some();
+
+    // Fee estimation: publish_item with a parent feed reference and dummy data.
+    let fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let dummy_nonce = [0u8; 32];
+        let dummy_ipfs_hash = [0u8; 32];
+        // Use the real feed item ID as parent if available, otherwise zeros.
+        let parent_id = feed_item_id().unwrap_or([0u8; 32]);
+        let publish_call = api::tx().content().publish_item(
+            api::runtime_types::pallet_content::Nonce(dummy_nonce),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![
+                api::runtime_types::pallet_content::pallet::ItemId(parent_id),
+            ]),
+            0x01,
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+        );
+        estimate_fee(&publish_call, &signer).await.ok()
+    });
+
+    let insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
 
     // Single smart status bar: error > saving > notice
     let status: Option<(&'static str, String)> = if let Some(ref err) = error_message() {
@@ -185,7 +215,7 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
                     div { class: "form-actions",
                         button {
                             class: "btn-primary",
-                            disabled: is_saving() || !has_active_account || !is_unlocked || title_empty || !feed_ready,
+                            disabled: is_saving() || !has_active_account || !is_unlocked || title_empty || !feed_ready || insufficient_funds(),
                             onclick: {
                                 let store_snap = account_store();
                                 let current_draft = draft();
@@ -231,6 +261,12 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
                     if has_active_account && !is_unlocked {
                         p { class: "save-locked-hint",
                             "Unlock the account from the sidebar to publish."
+                        }
+                    }
+                    if has_active_account && is_unlocked {
+                        InsufficientFundsHint {
+                            balance: chain_connection().details.active_account_balance,
+                            fee: fee_estimate().flatten(),
                         }
                     }
                 }

@@ -29,11 +29,56 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 Consumed anywhere in the tree with `use_context::<Signal<T>>()`:
 
 ```
-Signal<ChainConnection>   – best/finalized block numbers, genesis hash, runtime constants
+Signal<ChainConnection>   – best/finalized block numbers, genesis hash, runtime constants,
+                            and active_account_balance (free balance of the currently active
+                            account in planck, updated on every finalised block and on
+                            active-account switches)
 Signal<IpfsConnection>    – IPFS peer ID, addresses, connection status
 Signal<IndexerConnection> – indexed block spans, connection status
 Signal<AccountStore>      – local keystore: account list, active account, unlocked signers
 ```
+
+### Active account balance tracking
+
+`ChainDetails.active_account_balance: Option<u128>` is managed by the
+`watch_active_account_balance` background task (spawned from `App`).  It
+updates the balance in three situations:
+
+1. **Account switch** — whenever the active account address changes (delivered
+   via a `watch::Sender<Option<String>>` set by a `use_effect` in `App`), the
+   task does a one-shot Subxt balance query so the UI reflects the new
+   account's balance immediately.
+2. **Indexer event notification** — the task calls
+   `IndexerClient::subscribe_events` with
+   `Key::Custom { name: "account_id", value: Bytes32(raw_account_bytes) }`.
+   Whenever the indexer delivers a notification (any event that tagged this
+   account — Balances::Transfer, Balances::Deposit, Content::PublishItem,
+   etc.) the task does a one-shot Subxt query to re-fetch the balance.
+3. **Account deselected** — balance is set to `None` immediately.
+
+The `IndexerClient` used by this task is the same underlying WebSocket
+connection as the status-subscription client.  `maintain_indexer_connection`
+sends `Some(client.clone())` to a `watch::Sender<Option<IndexerClient>>`
+after a successful connect, and `None` before closing.  The balance watcher
+waits on `indexer_client_rx.changed()` so it resubscribes automatically
+whenever the indexer reconnects.
+
+### Per-extrinsic fee estimation
+
+`src/runtime_client.rs` exposes:
+
+```rust
+pub(crate) async fn estimate_fee<Call: subxt::tx::Payload>(
+    call: &Call,
+    signer: &SignerKeypair,
+) -> Result<u128, String>
+```
+
+Each transaction view uses `use_resource` to call `estimate_fee` with a
+representative (dummy-data) version of its specific extrinsic.  A `use_memo`
+then computes `insufficient_funds = balance < fee`.  Transaction buttons are
+disabled and an `InsufficientFundsHint` paragraph is rendered below them when
+`insufficient_funds` is true.
 
 ---
 
@@ -64,7 +109,7 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | File | Purpose |
 |---|---|
 | `src/main.rs` | Entry point, `Route` enum, `App` component, global context providers, three connection-watcher loops |
-| `src/runtime_client.rs` | `type AcuityClient = OnlineClient<PolkadotConfig>` and `connect()` targeting `ws://127.0.0.1:9944` |
+| `src/runtime_client.rs` | `type AcuityClient`, `connect()`, `fetch_account_balance()`, `estimate_fee()` targeting `ws://127.0.0.1:9944` |
 | `src/acuity_runtime.rs` | **Auto-generated** (~9 900 lines). Typed Subxt bindings for the Acuity Substrate runtime. Regenerate with `just generate-runtime-api`. Do not edit manually. |
 | `src/content.rs` | Protobuf message types, mixin ID constants, IPFS upload/download helpers, item ID derivation, indexer event queries via `acuity-index-api-rs`, typed indexer event field extraction, CID↔hex conversion utilities, `short_hex` display helper |
 | `src/accounts.rs` | Local keystore: sr25519 keypair generation, Polkadot-JS–compatible scrypt + XSalsa20-Poly1305 encryption, `AccountStore` CRUD |
@@ -98,6 +143,7 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `CommentCard` | `item_view/comment_card.rs` | Recursive comment card: body, revision selector, reactions, inline reply/edit forms, nested children |
 | `ImageDropZone` | `components.rs` | Shared drag-and-drop / click-to-pick image zone; used by `ProfileEdit`, `PublishFeed`, `PublishPost`, and `ItemView` edit tab |
 | `EmptyState` | `components.rs` | Shared centred empty/not-found card with optional CTA link; used by `ProfileView`, `ItemView`, `PublishPost`, `PublishFeed` |
+| `InsufficientFundsHint` | `components.rs` | Renders a hint paragraph below transaction buttons when `balance < fee`; hidden while loading |
 
 ---
 

@@ -94,6 +94,14 @@ impl AccountStore {
         self.unlocked_signers.contains_key(id)
     }
 
+    /// Returns a reference to the signer for the active account, if it is
+    /// currently unlocked.
+    pub fn active_signer(&self) -> Option<&SignerKeypair> {
+        self.active_account_id
+            .as_deref()
+            .and_then(|id| self.unlocked_signers.get(id))
+    }
+
     fn set_notice(&mut self, message: impl Into<String>) {
         self.notice_message = Some(message.into());
         self.error_message = None;

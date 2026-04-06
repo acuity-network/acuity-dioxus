@@ -6,9 +6,12 @@ pub mod types;
 
 use crate::{
     accounts::AccountStore,
+    acuity_runtime::api,
     comment::load_comments_for_item,
     content::{RevisionEntry, SelectedImage},
     item::{publish_item_revision, ItemDraft, PublishRevisionRequest},
+    runtime_client::estimate_fee,
+    ChainConnection,
     Route,
 };
 use dioxus::prelude::*;
@@ -19,7 +22,7 @@ use loader::load_item;
 use reactions::Reactions;
 use types::{ActiveTab, FeedPost, LoadedItem};
 
-use super::components::{EmptyState, ImageDropZone};
+use super::components::{EmptyState, ImageDropZone, InsufficientFundsHint};
 
 const ITEM_VIEW_CSS: Asset = asset!("/assets/styling/item_view.css");
 const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
@@ -27,6 +30,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 #[component]
 pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
 
     let mut loaded: Signal<Option<LoadedItem>> = use_signal(|| None);
     let mut is_loading = use_signal(|| false);
@@ -127,6 +131,51 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
             .active_account()
             .map(|a| a.address == item.owner_address)
             .unwrap_or(false)
+    });
+
+    // Fee estimation for "Save changes" (publish_revision).
+    let edit_fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let item_id = loaded()?.item_id;
+        let dummy_ipfs_hash = [0u8; 32];
+        let call = api::tx().content().publish_revision(
+            api::runtime_types::pallet_content::pallet::ItemId(item_id),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+        );
+        estimate_fee(&call, &signer).await.ok()
+    });
+
+    let edit_insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = edit_fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
+
+    // Fee estimation for "Post comment" (publish_item with parent).
+    let comment_fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let parent_id = loaded()?.item_id;
+        let dummy_nonce = [0u8; 32];
+        let dummy_ipfs_hash = [0u8; 32];
+        let call = api::tx().content().publish_item(
+            api::runtime_types::pallet_content::Nonce(dummy_nonce),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![
+                api::runtime_types::pallet_content::pallet::ItemId(parent_id),
+            ]),
+            0x01,
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+            api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+        );
+        estimate_fee(&call, &signer).await.ok()
+    });
+
+    let comment_insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = comment_fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
     });
 
     // Top-level comment submit handler (reply to the item itself).
@@ -510,9 +559,13 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                                 div { class: "comment-reply-actions",
                                     button {
                                         class: "btn-primary",
-                                        disabled: top_level_submitting() || top_level_reply_body().trim().is_empty(),
+                                        disabled: top_level_submitting() || top_level_reply_body().trim().is_empty() || comment_insufficient_funds(),
                                         onclick: submit_top_level_comment,
                                         if top_level_submitting() { "Posting…" } else { "Post comment" }
+                                    }
+                                    InsufficientFundsHint {
+                                        balance: chain_connection().details.active_account_balance,
+                                        fee: comment_fee_estimate().flatten(),
                                     }
                                 }
                             }
@@ -593,7 +646,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                         div { class: "form-actions",
                             button {
                                 class: "btn-primary",
-                                disabled: is_saving(),
+                                disabled: is_saving() || edit_insufficient_funds(),
                                 onclick: {
                                     let item_id = item.item_id;
                                     let content_type = item.content_type.clone();
@@ -647,6 +700,12 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                         if !account_store().is_active_unlocked() {
                             p { class: "save-locked-hint",
                                 "Unlock the account from the sidebar to save."
+                            }
+                        }
+                        if account_store().is_active_unlocked() {
+                            InsufficientFundsHint {
+                                balance: chain_connection().details.active_account_balance,
+                                fee: edit_fee_estimate().flatten(),
                             }
                         }
                     }

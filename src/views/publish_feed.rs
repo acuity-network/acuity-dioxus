@@ -1,12 +1,14 @@
 use crate::{
     accounts::AccountStore,
+    acuity_runtime::api,
     content::SelectedImage,
     feed::{publish_feed, FeedDraft, PublishFeedRequest},
-    Route,
+    runtime_client::estimate_fee,
+    ChainConnection, Route,
 };
 use dioxus::prelude::*;
 
-use super::components::{EmptyState, ImageDropZone};
+use super::components::{EmptyState, ImageDropZone, InsufficientFundsHint};
 
 const PUBLISH_FEED_CSS: Asset = asset!("/assets/styling/publish_feed.css");
 const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
@@ -15,6 +17,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 pub fn PublishFeed() -> Element {
     let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
+    let chain_connection = use_context::<Signal<ChainConnection>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -28,6 +31,37 @@ pub fn PublishFeed() -> Element {
 
     let has_active_account = active_account.is_some();
     let title_empty = draft().title.trim().is_empty();
+
+    // Fee estimation: batch_all([publish_item, add_item]) with dummy data.
+    let fee_estimate = use_resource(move || async move {
+        let signer = account_store().active_signer().cloned()?;
+        let dummy_nonce = [0u8; 32];
+        let dummy_item_id = [0u8; 32];
+        let dummy_ipfs_hash = [0u8; 32];
+        let publish_call = api::Call::Content(
+            api::runtime_types::pallet_content::pallet::Call::publish_item {
+                nonce: api::runtime_types::pallet_content::Nonce(dummy_nonce),
+                parents: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                flags: 0x01,
+                links: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                mentions: api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![]),
+                ipfs_hash: api::runtime_types::pallet_content::pallet::IpfsHash(dummy_ipfs_hash),
+            },
+        );
+        let add_item_call = api::Call::AccountContent(
+            api::runtime_types::pallet_account_content::pallet::Call::add_item {
+                item_id: api::runtime_types::pallet_content::pallet::ItemId(dummy_item_id),
+            },
+        );
+        let batch_call = api::tx().utility().batch_all(vec![publish_call, add_item_call]);
+        estimate_fee(&batch_call, &signer).await.ok()
+    });
+
+    let insufficient_funds = use_memo(move || {
+        let balance = chain_connection().details.active_account_balance;
+        let fee = fee_estimate().flatten();
+        matches!((balance, fee), (Some(b), Some(f)) if b < f)
+    });
 
     // Single smart status bar: error > saving > notice
     let status: Option<(&'static str, String)> = if let Some(ref err) = error_message() {
@@ -118,7 +152,7 @@ pub fn PublishFeed() -> Element {
                     div { class: "form-actions",
                         button {
                             class: "btn-primary",
-                            disabled: is_saving() || !has_active_account || !is_unlocked || title_empty,
+                            disabled: is_saving() || !has_active_account || !is_unlocked || title_empty || insufficient_funds(),
                             onclick: {
                                 let store_snap = account_store();
                                 let req = PublishFeedRequest {
@@ -158,6 +192,12 @@ pub fn PublishFeed() -> Element {
                     if has_active_account && !is_unlocked {
                         p { class: "save-locked-hint",
                             "Unlock the account from the sidebar to publish."
+                        }
+                    }
+                    if has_active_account && is_unlocked {
+                        InsufficientFundsHint {
+                            balance: chain_connection().details.active_account_balance,
+                            fee: fee_estimate().flatten(),
                         }
                     }
                 }
