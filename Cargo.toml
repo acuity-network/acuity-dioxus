@@ -9,7 +9,7 @@ edition = "2024"
 [dependencies]
 acuity-index-api-rs = "0.1.1"
 bs58 = "0.5"
-dioxus = { version = "0.7.1", features = ["router"] }
+dioxus = { version = "0.7.4", features = ["router"] }
 fast_qr = { version = "0.12", features = ["svg"] }
 futures = "0.3"
 base64 = "0.22"
