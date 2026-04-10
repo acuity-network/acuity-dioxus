@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     content::short_hex,
@@ -15,6 +16,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 #[component]
 pub fn ProfileView() -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -37,14 +39,18 @@ pub fn ProfileView() -> Element {
     // Load profile when address changes
     use_effect(move || {
         let address = active_address();
+        let client = indexer_client().clone();
         spawn(async move {
             error_message.set(None);
             let Some(address) = address else {
                 profile.set(None);
                 return;
             };
+            let Some(client) = client else {
+                return;
+            };
             is_loading.set(true);
-            match load_profile_for_account(&address).await {
+            match load_profile_for_account(&client, &address).await {
                 Ok(loaded) => profile.set(Some(loaded)),
                 Err(err) => {
                     profile.set(None);
@@ -58,14 +64,18 @@ pub fn ProfileView() -> Element {
     // Load pinned content items when address changes
     use_effect(move || {
         let address = active_address();
+        let client = indexer_client().clone();
         spawn(async move {
             content_error.set(None);
             content_items.set(Vec::new());
             let Some(address) = address else {
                 return;
             };
+            let Some(client) = client else {
+                return;
+            };
             content_loading.set(true);
-            match fetch_account_content_items(&address).await {
+            match fetch_account_content_items(&client, &address).await {
                 Ok(items) => content_items.set(items),
                 Err(err) => content_error.set(Some(err)),
             }

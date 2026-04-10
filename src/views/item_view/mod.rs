@@ -4,6 +4,7 @@ mod loader;
 mod reactions;
 pub mod types;
 
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
@@ -31,6 +32,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
     let chain_connection = use_context::<Signal<ChainConnection>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
 
     let mut loaded: Signal<Option<LoadedItem>> = use_signal(|| None);
     let mut is_loading = use_signal(|| false);
@@ -71,7 +73,11 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
     use_effect(move || {
         let id = encoded_item_id();
         let _tick = reload_tick();
+        let client = indexer_client().clone();
         spawn(async move {
+            let Some(client) = client else {
+                return;
+            };
             error_message.set(None);
             posts_error.set(None);
             comments_error.set(None);
@@ -79,7 +85,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
             comments.set(Vec::new());
             revision_history.set(Vec::new());
             is_loading.set(true);
-            match load_item(&id, None).await {
+            match load_item(&client, &id, None).await {
                 Ok((item, history, chain_latest)) => {
                     let is_feed = item.content_type == "Feed";
                     let item_id_hex = item.item_id_hex.clone();
@@ -98,7 +104,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                     // If this is a feed, load its child posts.
                     if is_feed {
                         posts_loading.set(true);
-                        match load_feed_posts(&item_id_hex).await {
+                        match load_feed_posts(&client, &item_id_hex).await {
                             Ok(posts) => feed_posts.set(posts),
                             Err(err) => posts_error.set(Some(err)),
                         }
@@ -107,7 +113,7 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
 
                     // Load comments for all item types.
                     comments_loading.set(true);
-                    match load_comments_for_item(item_id_hex.clone()).await {
+                    match load_comments_for_item(client, item_id_hex.clone()).await {
                         Ok(c) => comments.set(c),
                         Err(err) => comments_error.set(Some(err)),
                     }
@@ -312,9 +318,14 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                                         class: "iv-revision-banner-btn",
                                         onclick: move |_| {
                                             let id = encoded_item_id();
+                                            let client = indexer_client().clone();
                                             revision_switching.set(true);
                                             spawn(async move {
-                                                match load_item(&id, None).await {
+                                                let Some(client) = client else {
+                                                    revision_switching.set(false);
+                                                    return;
+                                                };
+                                                match load_item(&client, &id, None).await {
                                                     Ok((new_item, new_history, chain_latest)) => {
                                                         chain_latest_revision_id.set(chain_latest);
                                                         revision_history.set(new_history);
@@ -438,9 +449,14 @@ pub fn ItemView(encoded_item_id: ReadSignal<String>) -> Element {
                                             let is_latest = selected_rid == chain_latest_revision_id();
                                             let override_hash = if is_latest { None } else { Some(hash.clone()) };
                                             let id = encoded_item_id();
+                                            let client = indexer_client().clone();
                                             revision_switching.set(true);
                                             spawn(async move {
-                                                match load_item(&id, override_hash).await {
+                                                let Some(client) = client else {
+                                                    revision_switching.set(false);
+                                                    return;
+                                                };
+                                                match load_item(&client, &id, override_hash).await {
                                                     Ok((new_item, new_history, chain_latest)) => {
                                                         chain_latest_revision_id.set(chain_latest);
                                                         revision_history.set(new_history);

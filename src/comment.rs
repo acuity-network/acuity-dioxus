@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{acuity_runtime::api, runtime_client::connect as connect_acuity_client};
 use prost::Message;
 use rand::RngCore;
@@ -189,11 +190,12 @@ fn encode_comment_item(draft: &CommentDraft) -> Vec<u8> {
 /// The function is wrapped in `Box::pin` because it is mutually recursive with
 /// `load_single_comment` (which calls back into this function for nested replies).
 pub fn load_comments_for_item(
+    client: IndexerClient,
     item_id_hex: String,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<LoadedComment>, String>> + Send>>
 {
     Box::pin(async move {
-        let decoded_events = fetch_events_for_item(item_id_hex.clone()).await?;
+        let decoded_events = fetch_events_for_item(&client, item_id_hex.clone()).await?;
 
         let mut child_item_ids: Vec<String> = Vec::new();
         for decoded_event in &decoded_events {
@@ -212,7 +214,7 @@ pub fn load_comments_for_item(
 
         let mut comments = Vec::new();
         for child_id_hex in child_item_ids {
-            match load_single_comment(child_id_hex).await {
+            match load_single_comment(client.clone(), child_id_hex).await {
                 Ok(Some(comment)) => comments.push(comment),
                 Ok(None) => {} // Not a comment item — skip.
                 Err(_) => {}   // Skip items that fail to load.
@@ -229,12 +231,13 @@ pub fn load_comments_for_item(
 /// Also wrapped in `Box::pin` because it calls `load_comments_for_item` which
 /// in turn calls back here.
 fn load_single_comment(
+    client: IndexerClient,
     item_id_hex: String,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Option<LoadedComment>, String>> + Send>>
 {
     Box::pin(async move {
         // Fetch latest revision from IPFS.
-        let revision_hash = fetch_latest_revision_hash(item_id_hex.clone()).await?;
+        let revision_hash = fetch_latest_revision_hash(&client, item_id_hex.clone()).await?;
         let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
         let item = ItemMessage::decode(item_bytes.as_slice())
             .map_err(|e| format!("Failed to decode comment payload: {e}"))?;
@@ -260,7 +263,7 @@ fn load_single_comment(
         let encoded_item_id = bs58::encode(item_id_bytes).into_string();
 
         // Recurse: load replies to this comment.
-        let children = load_comments_for_item(item_id_hex.clone())
+        let children = load_comments_for_item(client, item_id_hex.clone())
             .await
             .unwrap_or_default();
 
@@ -321,9 +324,10 @@ async fn fetch_comment_state(item_id_hex: &str) -> Result<(String, u32, bool), S
 /// exposed here so that `CommentCard` can request it without importing
 /// lower-level content helpers directly.
 pub async fn load_comment_revision_history(
+    client: &IndexerClient,
     item_id_hex: String,
 ) -> Result<Vec<RevisionEntry>, String> {
-    fetch_revision_history(item_id_hex).await
+    fetch_revision_history(client, item_id_hex).await
 }
 
 /// Publish an edited revision of an existing comment.

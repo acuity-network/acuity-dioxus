@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{acuity_runtime::api, runtime_client::connect as connect_acuity_client};
 use prost::Message;
 use rand::RngCore;
@@ -56,6 +57,7 @@ pub struct LoadedFeedSummary {
 /// Items that fail to load are silently skipped so that one bad item cannot
 /// prevent the rest from appearing.
 pub async fn fetch_account_content_items(
+    indexer_client: &IndexerClient,
     address: &str,
 ) -> Result<Vec<LoadedFeedSummary>, String> {
     let account_id = account_id_from_ss58(address)?;
@@ -91,7 +93,7 @@ pub async fn fetch_account_content_items(
         let item_id: [u8; 32] = item_id_wrapper.0;
         let item_id_hex = bytes32_to_hex(&item_id);
 
-        let summary = resolve_item_summary(item_id, &item_id_hex).await;
+        let summary = resolve_item_summary(indexer_client, item_id, &item_id_hex).await;
         match summary {
             Ok(s) => summaries.push(s),
             Err(_) => continue, // skip items that fail to load
@@ -102,10 +104,11 @@ pub async fn fetch_account_content_items(
 }
 
 async fn resolve_item_summary(
+    client: &IndexerClient,
     item_id: [u8; 32],
     item_id_hex: &str,
 ) -> Result<LoadedFeedSummary, String> {
-    let revision_hash = fetch_latest_revision_hash(item_id_hex.to_string()).await?;
+    let revision_hash = fetch_latest_revision_hash(client, item_id_hex.to_string()).await?;
     let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode item payload: {error}"))?;

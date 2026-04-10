@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
@@ -37,11 +38,12 @@ fn parse_reactions_from_event(reactions_value: &serde_json::Value) -> Vec<u32> {
 }
 
 async fn fetch_reactions_from_indexer(
+    client: &IndexerClient,
     item_id_hex: String,
     revision_id: u32,
     active_address: Option<String>,
 ) -> Result<Vec<ReactionSummary>, String> {
-    let decoded_events = fetch_events_for_item(item_id_hex).await?;
+    let decoded_events = fetch_events_for_item(client, item_id_hex).await?;
 
     let mut reactor_latest: HashMap<String, (u32, u16, Vec<u32>)> = HashMap::new();
 
@@ -179,6 +181,7 @@ fn optimistic_update(
 pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let account_store = use_context::<Signal<AccountStore>>();
     let chain_connection = use_context::<Signal<ChainConnection>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
 
     let mut reactions: Signal<Vec<ReactionSummary>> = use_signal(Vec::new);
     let mut reactions_loading = use_signal(|| false);
@@ -218,10 +221,14 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
             .active_account()
             .map(|a| a.address.clone());
         let item_id_hex = bytes32_to_hex(&item_id);
+        let client = indexer_client().clone();
         spawn(async move {
+            let Some(client) = client else {
+                return;
+            };
             reactions_loading.set(true);
             reactions_error.set(None);
-            match fetch_reactions_from_indexer(item_id_hex, revision_id, active_address).await {
+            match fetch_reactions_from_indexer(&client, item_id_hex, revision_id, active_address).await {
                 Ok(r) => reactions.set(r),
                 Err(e) => reactions_error.set(Some(e)),
             }
@@ -331,19 +338,19 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
 
             if let Err(e) = result {
                 // Revert optimistic update on failure
-                match fetch_reactions_from_indexer(
-                    bytes32_to_hex(&item_id),
-                    revision_id(),
-                    account_store().active_account().map(|a| a.address.clone()),
-                )
-                .await
-                {
-                    Ok(r) => reactions.set(r),
-                    Err(_) => {
-                        // Fall back to the state before the optimistic update
-                        reactions.set(old_reactions);
-                    }
-                }
+                let reverted = if let Some(client) = indexer_client().as_ref() {
+                    fetch_reactions_from_indexer(
+                        client,
+                        bytes32_to_hex(&item_id),
+                        revision_id(),
+                        account_store().active_account().map(|a| a.address.clone()),
+                    )
+                    .await
+                    .ok()
+                } else {
+                    None
+                };
+                reactions.set(reverted.unwrap_or(old_reactions));
                 tx_error.set(Some(e));
             }
             is_submitting.set(false);

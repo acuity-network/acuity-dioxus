@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
@@ -28,6 +29,7 @@ pub fn CommentCard(
     account_store: Signal<AccountStore>,
 ) -> Element {
     let chain_connection = use_context::<Signal<ChainConnection>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
 
     // ── Reply state ───────────────────────────────────────────────────────────
     let mut reply_open = use_signal(|| false);
@@ -52,7 +54,14 @@ pub fn CommentCard(
     // Load the revision history for this comment lazily (non-blocking).
     let comment_item_id_hex = comment.item_id_hex.clone();
     let revision_history =
-        use_resource(move || load_comment_revision_history(comment_item_id_hex.clone()));
+        use_resource(move || {
+            let client = indexer_client().clone();
+            let hex = comment_item_id_hex.clone();
+            async move {
+                let client = client.ok_or_else(|| "Indexer not connected".to_string())?;
+                load_comment_revision_history(&client, hex).await
+            }
+        });
 
     let parent_item_id = comment.item_id;
     let comment_item_id = comment.item_id;

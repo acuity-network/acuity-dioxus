@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
@@ -19,6 +20,7 @@ pub fn ProfileEdit() -> Element {
     let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
     let chain_connection = use_context::<Signal<ChainConnection>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -103,6 +105,7 @@ pub fn ProfileEdit() -> Element {
     use_effect(move || {
         let address = active_address();
         let _tick = reload_tick();
+        let client = indexer_client().clone();
 
         spawn(async move {
             error_message.set(None);
@@ -119,8 +122,12 @@ pub fn ProfileEdit() -> Element {
                 return;
             };
 
+            let Some(client) = client else {
+                return;
+            };
+
             is_loading.set(true);
-            match load_profile_for_account(&address).await {
+            match load_profile_for_account(&client, &address).await {
                 Ok(profile) => {
                     apply_loaded_profile(
                         profile,

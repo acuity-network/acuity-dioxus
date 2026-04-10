@@ -1,4 +1,4 @@
-use crate::{INDEXER_URL, IPFS_API_URL};
+use crate::IPFS_API_URL;
 use acuity_index_api_rs::{Bytes32, CustomKey, CustomValue, DecodedEvent as IndexerDecodedEvent, IndexerClient, Key};
 use base64::Engine;
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
@@ -402,11 +402,9 @@ where
 /// Returns the full list of `IndexerDecodedEvent` entries in reverse
 /// chronological order (newest first), up to the indexer's per-query limit.
 pub async fn fetch_events_for_item(
+    client: &IndexerClient,
     item_id_hex: String,
 ) -> Result<Vec<IndexerDecodedEvent>, String> {
-    let client = IndexerClient::connect(INDEXER_URL)
-        .await
-        .map_err(|error| format!("Failed to connect to {INDEXER_URL}: {error}"))?;
     let response = client
         .get_events(item_id_query_key(&item_id_hex)?, None, None)
         .await
@@ -435,8 +433,8 @@ fn item_id_query_key(item_id_hex: &str) -> Result<Key, String> {
     }))
 }
 
-pub async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, String> {
-    let history = fetch_revision_history(item_id_hex).await?;
+pub async fn fetch_latest_revision_hash(client: &IndexerClient, item_id_hex: String) -> Result<String, String> {
+    let history = fetch_revision_history(client, item_id_hex).await?;
     history
         .into_iter()
         .next()
@@ -449,8 +447,8 @@ pub async fn fetch_latest_revision_hash(item_id_hex: String) -> Result<String, S
 /// Fetches the full revision history for an item from the indexer, returning
 /// all `Content::PublishRevision` events sorted by `revision_id` **descending**
 /// (newest first).
-pub async fn fetch_revision_history(item_id_hex: String) -> Result<Vec<RevisionEntry>, String> {
-    let decoded_events = fetch_events_for_item(item_id_hex).await?;
+pub async fn fetch_revision_history(client: &IndexerClient, item_id_hex: String) -> Result<Vec<RevisionEntry>, String> {
+    let decoded_events = fetch_events_for_item(client, item_id_hex).await?;
 
     if decoded_events.is_empty() {
         return Err(

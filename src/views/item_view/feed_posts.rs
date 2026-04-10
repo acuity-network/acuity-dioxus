@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::content::{
     decode_single_mixin, event_string_field, fetch_events_for_item, fetch_ipfs_digest_bytes,
     fetch_latest_revision_hash, hex_to_bytes32, is_content_event,
@@ -11,8 +12,8 @@ use super::types::FeedPost;
 /// Loads child posts for a feed by querying the indexer for all events
 /// keyed by the feed's item_id, then filtering for `Content::PublishItem`
 /// events where this feed appears as a parent.
-pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String> {
-    let decoded_events = fetch_events_for_item(item_id_hex.to_string()).await?;
+pub async fn load_feed_posts(client: &IndexerClient, item_id_hex: &str) -> Result<Vec<FeedPost>, String> {
+    let decoded_events = fetch_events_for_item(client, item_id_hex.to_string()).await?;
 
     // Collect child item IDs from PublishItem events where this feed is a parent.
     let mut child_item_ids: Vec<String> = Vec::new();
@@ -39,7 +40,7 @@ pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String>
     // Load each child post's content from IPFS.
     let mut posts = Vec::new();
     for child_id_hex in child_item_ids {
-        match load_single_post(&child_id_hex).await {
+        match load_single_post(client, &child_id_hex).await {
             Ok(p) => posts.push(p),
             Err(_) => continue, // Skip posts that fail to load
         }
@@ -48,8 +49,8 @@ pub async fn load_feed_posts(item_id_hex: &str) -> Result<Vec<FeedPost>, String>
     Ok(posts)
 }
 
-pub async fn load_single_post(item_id_hex: &str) -> Result<FeedPost, String> {
-    let revision_hash = fetch_latest_revision_hash(item_id_hex.to_string()).await?;
+pub async fn load_single_post(client: &IndexerClient, item_id_hex: &str) -> Result<FeedPost, String> {
+    let revision_hash = fetch_latest_revision_hash(client, item_id_hex.to_string()).await?;
     let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode post payload: {error}"))?;

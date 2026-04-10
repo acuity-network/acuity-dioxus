@@ -20,7 +20,7 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 
 **IPFS loop** (`watch_ipfs_daemon`): Polls `POST /api/v0/id` every 5 s. The polling request and sleep interval are both interruptible by the app shutdown signal so the task does not linger during exit. Used only for status display and as the upload/download endpoint; content ops call the HTTP API directly from async helpers in `src/content.rs`.
 
-**Indexer loop** (`watch_indexer`): Uses the published `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. The subscription loop listens for the shared shutdown signal and then explicitly closes the websocket with `IndexerClient::close()` before exit. One-off `get_events` queries for item data are also routed through that shared client from `src/content.rs`. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
+**Indexer loop** (`watch_indexer`): Uses the published `acuity-index-api-rs` library client to connect to the indexer, fetch the initial status snapshot, and subscribe to ongoing status updates. The subscription loop listens for the shared shutdown signal and then explicitly closes the websocket with `IndexerClient::close()` before exit. The live `IndexerClient` is shared with components via a `Signal<Option<IndexerClient>>` context (kept in sync by a `use_hook` task that watches the same `watch::channel` used by the balance watcher). All `get_events` queries for item data, revision history, and reactions are routed through this shared client. Indexed events are consumed through the crate's typed `DecodedEvent`/`StoredEvent` model and its field helpers instead of reparsing raw JSON event blobs in the app.
 
 ---
 
@@ -29,13 +29,15 @@ All three connections share the same lifecycle pattern: `Connecting → Connecte
 Consumed anywhere in the tree with `use_context::<Signal<T>>()`:
 
 ```
-Signal<ChainConnection>   – best/finalized block numbers, genesis hash, runtime constants,
-                            and active_account_balance (free balance of the currently active
-                            account in planck, updated on every finalised block and on
-                            active-account switches)
-Signal<IpfsConnection>    – IPFS peer ID, addresses, connection status
-Signal<IndexerConnection> – indexed block spans, connection status
-Signal<AccountStore>      – local keystore: account list, active account, unlocked signers
+Signal<ChainConnection>          – best/finalized block numbers, genesis hash, runtime constants,
+                                   and active_account_balance (free balance of the currently active
+                                   account in planck, updated on every finalised block and on
+                                   active-account switches)
+Signal<IpfsConnection>           – IPFS peer ID, addresses, connection status
+Signal<IndexerConnection>        – indexed block spans, connection status
+Signal<AccountStore>             – local keystore: account list, active account, unlocked signers
+Signal<Option<IndexerClient>>    – shared indexer WebSocket client for event queries; `None` while
+                                   disconnected, automatically updated when the indexer reconnects
 ```
 
 ### Active account balance tracking

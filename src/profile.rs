@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{acuity_runtime::api, runtime_client::connect as connect_acuity_client};
 use prost::Message;
 use rand::RngCore;
@@ -64,7 +65,7 @@ enum AccountType {
     Test = 8,
 }
 
-pub async fn load_profile_for_account(address: &str) -> Result<LoadedProfile, String> {
+pub async fn load_profile_for_account(client: &IndexerClient, address: &str) -> Result<LoadedProfile, String> {
     let account_id = account_id_from_ss58(address)?;
     let item_id = fetch_profile_item_id(account_id).await?;
 
@@ -73,7 +74,7 @@ pub async fn load_profile_for_account(address: &str) -> Result<LoadedProfile, St
     };
 
     let item_id_hex = bytes32_to_hex(&item_id);
-    let revision_ipfs_hash = fetch_latest_revision_hash(item_id_hex.clone()).await?;
+    let revision_ipfs_hash = fetch_latest_revision_hash(client, item_id_hex.clone()).await?;
     let item_bytes = fetch_ipfs_digest_bytes(&revision_ipfs_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode profile payload: {error}"))?;

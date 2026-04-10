@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
@@ -21,7 +22,7 @@ const PROFILE_CSS: Asset = asset!("/assets/styling/profile.css");
 
 /// Decodes the base58-encoded feed ID from the route, loads the feed title,
 /// and returns `(feed_item_id_bytes, feed_title)`.
-async fn load_feed_context(encoded_feed_id: &str) -> Result<([u8; 32], String), String> {
+async fn load_feed_context(client: &IndexerClient, encoded_feed_id: &str) -> Result<([u8; 32], String), String> {
     let feed_id_bytes: [u8; 32] = bs58::decode(encoded_feed_id)
         .into_vec()
         .map_err(|error| format!("Invalid feed ID encoding: {error}"))?
@@ -29,7 +30,7 @@ async fn load_feed_context(encoded_feed_id: &str) -> Result<([u8; 32], String), 
         .map_err(|_| "Feed ID must be 32 bytes.".to_string())?;
 
     let item_id_hex = bytes32_to_hex(&feed_id_bytes);
-    let revision_hash = fetch_latest_revision_hash(item_id_hex).await?;
+    let revision_hash = fetch_latest_revision_hash(client, item_id_hex).await?;
     let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode feed payload: {error}"))?;
@@ -46,6 +47,7 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
     let navigator = use_navigator();
     let account_store = use_context::<Signal<AccountStore>>();
     let chain_connection = use_context::<Signal<ChainConnection>>();
+    let indexer_client = use_context::<Signal<Option<IndexerClient>>>();
     let account_snapshot = account_store();
     let active_account = account_snapshot.active_account().cloned();
     let is_unlocked = account_snapshot.is_active_unlocked();
@@ -69,9 +71,13 @@ pub fn PublishPost(encoded_feed_id: String) -> Element {
 
     use_effect(move || {
         let id = encoded_id();
+        let client = indexer_client().clone();
         spawn(async move {
+            let Some(client) = client else {
+                return;
+            };
             feed_loading.set(true);
-            match load_feed_context(&id).await {
+            match load_feed_context(&client, &id).await {
                 Ok((item_id, title)) => {
                     feed_item_id.set(Some(item_id));
                     feed_title.set(Some(title));

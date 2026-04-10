@@ -1,3 +1,4 @@
+use acuity_index_api_rs::IndexerClient;
 use crate::{
     acuity_runtime::api,
     content::{
@@ -25,6 +26,7 @@ use super::types::{content_type_label, LoadedItem, ParentSummary};
 ///
 /// Returns `(LoadedItem, revision_history, chain_latest_revision_id)`.
 pub async fn load_item(
+    client: &IndexerClient,
     encoded_item_id: &str,
     ipfs_hash_override: Option<String>,
 ) -> Result<(LoadedItem, Vec<RevisionEntry>, u32), String> {
@@ -47,7 +49,7 @@ pub async fn load_item(
 
     // Fetch revision history and on-chain state concurrently.
     let (history_result, state_result) = tokio::join!(
-        fetch_revision_history(item_id_hex.clone()),
+        fetch_revision_history(client, item_id_hex.clone()),
         fetch_item_state(item_id),
     );
 
@@ -104,7 +106,7 @@ pub async fn load_item(
     };
 
     // Load parent summaries from the item's own PublishItem indexer event.
-    let parents = load_parent_summaries(&item_id_hex).await.unwrap_or_default();
+    let parents = load_parent_summaries(client, &item_id_hex).await.unwrap_or_default();
 
     Ok((
         LoadedItem {
@@ -159,8 +161,8 @@ pub async fn fetch_item_state(item_id: [u8; 32]) -> Result<(String, u32), String
 /// Finds this item's own `Content::PublishItem` event in the indexer and
 /// returns a lightweight summary for each declared parent.  Parents that
 /// fail to load are silently skipped.
-pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummary>, String> {
-    let decoded_events = fetch_events_for_item(item_id_hex.to_string()).await?;
+pub async fn load_parent_summaries(client: &IndexerClient, item_id_hex: &str) -> Result<Vec<ParentSummary>, String> {
+    let decoded_events = fetch_events_for_item(client, item_id_hex.to_string()).await?;
 
     // Find the PublishItem event whose item_id matches this item (not a child).
     let mut parent_hex_ids: Vec<String> = Vec::new();
@@ -208,7 +210,7 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
 
     let mut summaries = Vec::new();
     for parent_hex in parent_hex_ids {
-        match load_parent_summary(&parent_hex).await {
+        match load_parent_summary(client, &parent_hex).await {
             Ok(summary) => summaries.push(summary),
             Err(_) => continue,
         }
@@ -217,8 +219,8 @@ pub async fn load_parent_summaries(item_id_hex: &str) -> Result<Vec<ParentSummar
     Ok(summaries)
 }
 
-pub async fn load_parent_summary(item_id_hex: &str) -> Result<ParentSummary, String> {
-    let revision_hash = fetch_latest_revision_hash(item_id_hex.to_string()).await?;
+pub async fn load_parent_summary(client: &IndexerClient, item_id_hex: &str) -> Result<ParentSummary, String> {
+    let revision_hash = fetch_latest_revision_hash(client, item_id_hex.to_string()).await?;
     let item_bytes = fetch_ipfs_digest_bytes(&revision_hash).await?;
     let item = ItemMessage::decode(item_bytes.as_slice())
         .map_err(|error| format!("Failed to decode parent item payload: {error}"))?;

@@ -325,6 +325,25 @@ fn App() -> Element {
         watch::channel::<Option<IndexerClient>>(None)
     });
 
+    // Provide a shared IndexerClient to all components via context.
+    // A background task watches the channel and keeps the signal in sync.
+    let indexer_client: Signal<Option<IndexerClient>> = use_signal(|| None);
+    use_context_provider(|| indexer_client);
+    let _indexer_client_sync = use_hook({
+        let mut rx = indexer_client_tx.subscribe();
+        let mut indexer_client = indexer_client;
+        move || {
+            spawn(async move {
+                loop {
+                    if rx.changed().await.is_err() {
+                        break;
+                    }
+                    indexer_client.set(rx.borrow().clone());
+                }
+            })
+        }
+    });
+
     let chain_shutdown = shutdown.clone();
     let _connection_task = use_hook(move || {
         let chain_connection = chain_connection;
