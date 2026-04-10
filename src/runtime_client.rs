@@ -1,5 +1,4 @@
 use crate::{acuity_runtime::api, ACUITY_NODE_URL};
-use parity_scale_codec::{Compact, Decode, Encode};
 use subxt::{OnlineClient, PolkadotConfig};
 use subxt_signer::sr25519::Keypair as SignerKeypair;
 
@@ -74,28 +73,8 @@ where
         .sign(signer)
         .map_err(|e| format!("Failed to sign transaction for fee estimation: {e}"))?;
 
-    // Call TransactionPaymentApi_query_info via call_raw, decoding the response
-    // as (Compact<u64>, Compact<u64>, u8, u64) — Acuity's RuntimeDispatchInfo
-    // uses u64 for partial_fee, not u128 as assumed by partial_fee_estimate().
-    let encoded_tx = signed.encoded();
-    let mut params = encoded_tx.to_vec();
-    (encoded_tx.len() as u32).encode_to(&mut params);
-
-    let response = at
-        .runtime_apis()
-        .call_raw("TransactionPaymentApi_query_info", Some(&params))
+    signed
+        .partial_fee_estimate()
         .await
-        .map_err(|e| {
-            let msg = format!("Fee estimation failed: {e}");
-            tracing::warn!("{msg}");
-            msg
-        })?;
-
-    // data layout: { weight: { ref_time: Compact<u64>, proof_size: Compact<u64> },
-    //                class: u8, partial_fee: u64 }
-    let (_, _, _, partial_fee) =
-        <(Compact<u64>, Compact<u64>, u8, u64)>::decode(&mut response.as_ref())
-            .map_err(|e| format!("Failed to decode fee info: {e}"))?;
-
-    Ok(partial_fee as u128)
+        .map_err(|e| format!("Fee estimation failed: {e}"))
 }

@@ -741,10 +741,9 @@ pub mod api {
                         "query_info",
                         (uxt, len),
                         [
-                            24u8, 42u8, 137u8, 188u8, 70u8, 224u8, 145u8, 166u8, 22u8, 122u8, 72u8,
-                            73u8, 139u8, 92u8, 235u8, 144u8, 95u8, 193u8, 39u8, 238u8, 220u8,
-                            222u8, 144u8, 83u8, 226u8, 13u8, 83u8, 120u8, 142u8, 111u8, 231u8,
-                            69u8,
+                            56u8, 30u8, 174u8, 34u8, 202u8, 24u8, 177u8, 189u8, 145u8, 36u8, 1u8,
+                            156u8, 98u8, 209u8, 178u8, 49u8, 198u8, 23u8, 150u8, 173u8, 35u8,
+                            205u8, 147u8, 129u8, 42u8, 22u8, 69u8, 3u8, 129u8, 8u8, 196u8, 139u8,
                         ],
                     )
                 }
@@ -761,10 +760,10 @@ pub mod api {
                         "query_fee_details",
                         (uxt, len),
                         [
-                            182u8, 198u8, 165u8, 34u8, 109u8, 68u8, 119u8, 118u8, 116u8, 240u8,
-                            160u8, 4u8, 1u8, 14u8, 169u8, 207u8, 142u8, 193u8, 16u8, 89u8, 179u8,
-                            215u8, 246u8, 166u8, 194u8, 49u8, 110u8, 19u8, 144u8, 241u8, 161u8,
-                            190u8,
+                            117u8, 60u8, 137u8, 159u8, 237u8, 252u8, 216u8, 238u8, 232u8, 1u8,
+                            100u8, 152u8, 26u8, 185u8, 145u8, 125u8, 68u8, 189u8, 4u8, 30u8, 125u8,
+                            7u8, 196u8, 153u8, 235u8, 51u8, 219u8, 108u8, 185u8, 254u8, 100u8,
+                            201u8,
                         ],
                     )
                 }
@@ -780,9 +779,10 @@ pub mod api {
                         "query_weight_to_fee",
                         (weight,),
                         [
-                            43u8, 38u8, 7u8, 127u8, 93u8, 202u8, 221u8, 100u8, 79u8, 26u8, 61u8,
-                            51u8, 106u8, 250u8, 233u8, 161u8, 32u8, 72u8, 198u8, 28u8, 94u8, 150u8,
-                            8u8, 143u8, 58u8, 148u8, 69u8, 198u8, 215u8, 27u8, 186u8, 242u8,
+                            206u8, 243u8, 189u8, 83u8, 231u8, 244u8, 247u8, 52u8, 126u8, 208u8,
+                            224u8, 5u8, 163u8, 108u8, 254u8, 114u8, 214u8, 156u8, 227u8, 217u8,
+                            211u8, 198u8, 121u8, 164u8, 110u8, 54u8, 181u8, 146u8, 50u8, 146u8,
+                            146u8, 23u8,
                         ],
                     )
                 }
@@ -798,10 +798,9 @@ pub mod api {
                         "query_length_to_fee",
                         (length,),
                         [
-                            129u8, 136u8, 216u8, 144u8, 66u8, 102u8, 146u8, 169u8, 202u8, 11u8,
-                            0u8, 146u8, 200u8, 172u8, 84u8, 238u8, 129u8, 32u8, 214u8, 169u8,
-                            130u8, 111u8, 112u8, 68u8, 51u8, 8u8, 174u8, 90u8, 81u8, 46u8, 0u8,
-                            249u8,
+                            92u8, 132u8, 29u8, 119u8, 66u8, 11u8, 196u8, 224u8, 129u8, 23u8, 249u8,
+                            12u8, 32u8, 28u8, 92u8, 50u8, 188u8, 101u8, 203u8, 229u8, 248u8, 216u8,
+                            130u8, 150u8, 212u8, 161u8, 81u8, 254u8, 116u8, 89u8, 162u8, 48u8,
                         ],
                     )
                 }
@@ -815,7 +814,7 @@ pub mod api {
                     use super::runtime_types;
                     pub type Output =
                         runtime_types::pallet_transaction_payment::types::RuntimeDispatchInfo<
-                            ::core::primitive::u64,
+                            ::core::primitive::u128,
                             runtime_types::sp_weights::weight_v2::Weight,
                         >;
                 }
@@ -828,7 +827,7 @@ pub mod api {
                 pub mod output {
                     use super::runtime_types;
                     pub type Output = runtime_types::pallet_transaction_payment::types::FeeDetails<
-                        ::core::primitive::u64,
+                        ::core::primitive::u128,
                     >;
                 }
             }
@@ -838,7 +837,7 @@ pub mod api {
                 pub type Weight = runtime_types::sp_weights::weight_v2::Weight;
                 pub mod output {
                     use super::runtime_types;
-                    pub type Output = ::core::primitive::u64;
+                    pub type Output = ::core::primitive::u128;
                 }
             }
             pub mod query_length_to_fee {
@@ -847,7 +846,7 @@ pub mod api {
                 pub type Length = ::core::primitive::u32;
                 pub mod output {
                     use super::runtime_types;
-                    pub type Output = ::core::primitive::u64;
+                    pub type Output = ::core::primitive::u128;
                 }
             }
         }
@@ -1077,9 +1076,9 @@ pub mod api {
             .hash();
         runtime_metadata_hash
             == [
-                32u8, 96u8, 251u8, 139u8, 113u8, 40u8, 210u8, 205u8, 119u8, 72u8, 179u8, 144u8,
-                73u8, 75u8, 46u8, 53u8, 116u8, 61u8, 216u8, 10u8, 221u8, 108u8, 45u8, 68u8, 235u8,
-                252u8, 37u8, 57u8, 14u8, 33u8, 169u8, 90u8,
+                243u8, 117u8, 191u8, 182u8, 4u8, 199u8, 214u8, 236u8, 209u8, 197u8, 81u8, 17u8,
+                20u8, 193u8, 248u8, 212u8, 201u8, 146u8, 36u8, 9u8, 11u8, 80u8, 111u8, 200u8,
+                170u8, 140u8, 5u8, 19u8, 19u8, 241u8, 193u8, 48u8,
             ]
     }
     pub mod system {
@@ -1833,10 +1832,9 @@ pub mod api {
                         "System",
                         "Account",
                         [
-                            235u8, 20u8, 254u8, 171u8, 170u8, 42u8, 213u8, 117u8, 146u8, 241u8,
-                            225u8, 34u8, 234u8, 61u8, 199u8, 13u8, 24u8, 78u8, 7u8, 4u8, 213u8,
-                            119u8, 161u8, 176u8, 72u8, 179u8, 237u8, 226u8, 192u8, 160u8, 108u8,
-                            18u8,
+                            181u8, 49u8, 172u8, 169u8, 233u8, 186u8, 227u8, 180u8, 188u8, 130u8,
+                            4u8, 70u8, 12u8, 226u8, 233u8, 72u8, 145u8, 59u8, 210u8, 78u8, 48u8,
+                            177u8, 203u8, 27u8, 216u8, 196u8, 244u8, 208u8, 26u8, 34u8, 13u8, 50u8,
                         ],
                     )
                 }
@@ -2005,9 +2003,10 @@ pub mod api {
                         "System",
                         "Events",
                         [
-                            9u8, 150u8, 92u8, 37u8, 156u8, 57u8, 40u8, 244u8, 121u8, 168u8, 222u8,
-                            21u8, 110u8, 224u8, 35u8, 161u8, 5u8, 25u8, 171u8, 159u8, 92u8, 172u8,
-                            209u8, 224u8, 200u8, 2u8, 29u8, 106u8, 57u8, 175u8, 159u8, 122u8,
+                            6u8, 93u8, 0u8, 73u8, 123u8, 123u8, 109u8, 27u8, 153u8, 165u8, 74u8,
+                            188u8, 65u8, 124u8, 218u8, 131u8, 209u8, 188u8, 243u8, 213u8, 133u8,
+                            238u8, 131u8, 50u8, 139u8, 187u8, 229u8, 187u8, 65u8, 79u8, 179u8,
+                            61u8,
                         ],
                     )
                 }
@@ -2195,7 +2194,7 @@ pub mod api {
                 }
                 pub type Output = runtime_types::frame_system::AccountInfo<
                     ::core::primitive::u32,
-                    runtime_types::pallet_balances::types::AccountData<::core::primitive::u64>,
+                    runtime_types::pallet_balances::types::AccountData<::core::primitive::u128>,
                 >;
             }
             pub mod extrinsic_count {
@@ -2804,7 +2803,7 @@ pub mod api {
             pub mod transfer_allow_death {
                 use super::runtime_types;
                 pub type Dest = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-                pub type Value = ::core::primitive::u64;
+                pub type Value = ::core::primitive::u128;
             }
             impl TransferAllowDeath {
                 const PALLET_NAME: &'static str = "Balances";
@@ -2834,7 +2833,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type Source = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
                 pub type Dest = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-                pub type Value = ::core::primitive::u64;
+                pub type Value = ::core::primitive::u128;
             }
             impl ForceTransfer {
                 const PALLET_NAME: &'static str = "Balances";
@@ -2866,7 +2865,7 @@ pub mod api {
             pub mod transfer_keep_alive {
                 use super::runtime_types;
                 pub type Dest = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-                pub type Value = ::core::primitive::u64;
+                pub type Value = ::core::primitive::u128;
             }
             impl TransferKeepAlive {
                 const PALLET_NAME: &'static str = "Balances";
@@ -2934,7 +2933,7 @@ pub mod api {
             pub mod force_unreserve {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl ForceUnreserve {
                 const PALLET_NAME: &'static str = "Balances";
@@ -2994,7 +2993,7 @@ pub mod api {
             pub mod force_set_balance {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-                pub type NewFree = ::core::primitive::u64;
+                pub type NewFree = ::core::primitive::u128;
             }
             impl ForceSetBalance {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3025,7 +3024,7 @@ pub mod api {
             pub mod force_adjust_total_issuance {
                 use super::runtime_types;
                 pub type Direction = runtime_types::pallet_balances::types::AdjustmentDirection;
-                pub type Delta = ::core::primitive::u64;
+                pub type Delta = ::core::primitive::u128;
             }
             impl ForceAdjustTotalIssuance {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3057,7 +3056,7 @@ pub mod api {
             }
             pub mod burn {
                 use super::runtime_types;
-                pub type Value = ::core::primitive::u64;
+                pub type Value = ::core::primitive::u128;
                 pub type KeepAlive = ::core::primitive::bool;
             }
             impl Burn {
@@ -3090,10 +3089,10 @@ pub mod api {
                             "transfer_allow_death",
                             super::TransferAllowDeath { dest, value },
                             [
-                                55u8, 189u8, 102u8, 71u8, 231u8, 179u8, 169u8, 229u8, 206u8, 42u8,
-                                10u8, 117u8, 36u8, 34u8, 30u8, 145u8, 227u8, 105u8, 252u8, 188u8,
-                                162u8, 0u8, 84u8, 24u8, 123u8, 241u8, 152u8, 118u8, 181u8, 182u8,
-                                137u8, 241u8,
+                                51u8, 166u8, 195u8, 10u8, 139u8, 218u8, 55u8, 130u8, 6u8, 194u8,
+                                35u8, 140u8, 27u8, 205u8, 214u8, 222u8, 102u8, 43u8, 143u8, 145u8,
+                                86u8, 219u8, 210u8, 147u8, 13u8, 39u8, 51u8, 21u8, 237u8, 179u8,
+                                132u8, 130u8,
                             ],
                         )
                     }
@@ -3115,10 +3114,10 @@ pub mod api {
                                 value,
                             },
                             [
-                                15u8, 9u8, 232u8, 170u8, 117u8, 161u8, 184u8, 255u8, 3u8, 155u8,
-                                165u8, 226u8, 151u8, 189u8, 226u8, 21u8, 14u8, 70u8, 17u8, 43u8,
-                                181u8, 59u8, 158u8, 222u8, 167u8, 59u8, 61u8, 233u8, 78u8, 108u8,
-                                161u8, 192u8,
+                                154u8, 93u8, 222u8, 27u8, 12u8, 248u8, 63u8, 213u8, 224u8, 86u8,
+                                250u8, 153u8, 249u8, 102u8, 83u8, 160u8, 79u8, 125u8, 105u8, 222u8,
+                                77u8, 180u8, 90u8, 105u8, 81u8, 217u8, 60u8, 25u8, 213u8, 51u8,
+                                185u8, 96u8,
                             ],
                         )
                     }
@@ -3139,10 +3138,10 @@ pub mod api {
                             "transfer_keep_alive",
                             super::TransferKeepAlive { dest, value },
                             [
-                                126u8, 208u8, 16u8, 244u8, 94u8, 74u8, 166u8, 13u8, 149u8, 95u8,
-                                88u8, 250u8, 95u8, 0u8, 43u8, 57u8, 18u8, 129u8, 24u8, 210u8, 91u8,
-                                50u8, 251u8, 73u8, 126u8, 218u8, 244u8, 52u8, 36u8, 175u8, 28u8,
-                                210u8,
+                                245u8, 14u8, 190u8, 193u8, 32u8, 210u8, 74u8, 92u8, 25u8, 182u8,
+                                76u8, 55u8, 247u8, 83u8, 114u8, 75u8, 143u8, 236u8, 117u8, 25u8,
+                                54u8, 157u8, 208u8, 207u8, 233u8, 89u8, 70u8, 161u8, 235u8, 242u8,
+                                222u8, 59u8,
                             ],
                         )
                     }
@@ -3193,10 +3192,10 @@ pub mod api {
                             "force_unreserve",
                             super::ForceUnreserve { who, amount },
                             [
-                                194u8, 160u8, 176u8, 186u8, 10u8, 132u8, 201u8, 232u8, 127u8, 9u8,
-                                234u8, 37u8, 167u8, 77u8, 157u8, 228u8, 62u8, 207u8, 172u8, 240u8,
-                                1u8, 10u8, 136u8, 97u8, 115u8, 13u8, 2u8, 61u8, 200u8, 235u8, 39u8,
-                                97u8,
+                                142u8, 151u8, 64u8, 205u8, 46u8, 64u8, 62u8, 122u8, 108u8, 49u8,
+                                223u8, 140u8, 120u8, 153u8, 35u8, 165u8, 187u8, 38u8, 157u8, 200u8,
+                                123u8, 199u8, 198u8, 168u8, 208u8, 159u8, 39u8, 134u8, 92u8, 103u8,
+                                84u8, 171u8,
                             ],
                         )
                     }
@@ -3239,10 +3238,10 @@ pub mod api {
                             "force_set_balance",
                             super::ForceSetBalance { who, new_free },
                             [
-                                172u8, 128u8, 27u8, 158u8, 43u8, 74u8, 29u8, 195u8, 16u8, 214u8,
-                                1u8, 128u8, 138u8, 144u8, 6u8, 236u8, 61u8, 41u8, 155u8, 208u8,
-                                57u8, 42u8, 237u8, 229u8, 130u8, 214u8, 8u8, 93u8, 57u8, 219u8,
-                                178u8, 197u8,
+                                114u8, 229u8, 59u8, 204u8, 180u8, 83u8, 17u8, 4u8, 59u8, 4u8, 55u8,
+                                39u8, 151u8, 196u8, 124u8, 60u8, 209u8, 65u8, 193u8, 11u8, 44u8,
+                                164u8, 116u8, 93u8, 169u8, 30u8, 199u8, 165u8, 55u8, 231u8, 223u8,
+                                43u8,
                             ],
                         )
                     }
@@ -3262,10 +3261,10 @@ pub mod api {
                             "force_adjust_total_issuance",
                             super::ForceAdjustTotalIssuance { direction, delta },
                             [
-                                70u8, 239u8, 219u8, 254u8, 5u8, 227u8, 119u8, 182u8, 85u8, 96u8,
-                                88u8, 71u8, 89u8, 73u8, 199u8, 50u8, 89u8, 157u8, 30u8, 121u8,
-                                34u8, 184u8, 9u8, 118u8, 51u8, 182u8, 121u8, 109u8, 22u8, 155u8,
-                                83u8, 198u8,
+                                208u8, 134u8, 56u8, 133u8, 232u8, 164u8, 10u8, 213u8, 53u8, 193u8,
+                                190u8, 63u8, 236u8, 186u8, 96u8, 122u8, 104u8, 87u8, 173u8, 38u8,
+                                58u8, 176u8, 21u8, 78u8, 42u8, 106u8, 46u8, 248u8, 251u8, 190u8,
+                                150u8, 202u8,
                             ],
                         )
                     }
@@ -3286,10 +3285,10 @@ pub mod api {
                             "burn",
                             super::Burn { value, keep_alive },
                             [
-                                47u8, 248u8, 43u8, 36u8, 119u8, 205u8, 108u8, 21u8, 199u8, 180u8,
-                                233u8, 162u8, 61u8, 240u8, 233u8, 246u8, 119u8, 19u8, 172u8, 171u8,
-                                38u8, 155u8, 189u8, 243u8, 40u8, 235u8, 23u8, 221u8, 158u8, 47u8,
-                                183u8, 10u8,
+                                176u8, 64u8, 7u8, 109u8, 16u8, 44u8, 145u8, 125u8, 147u8, 152u8,
+                                130u8, 114u8, 221u8, 201u8, 150u8, 162u8, 118u8, 71u8, 52u8, 92u8,
+                                240u8, 116u8, 203u8, 98u8, 5u8, 22u8, 43u8, 102u8, 94u8, 208u8,
+                                101u8, 57u8,
                             ],
                         )
                     }
@@ -3315,7 +3314,7 @@ pub mod api {
             pub mod endowed {
                 use super::runtime_types;
                 pub type Account = ::subxt::utils::AccountId32;
-                pub type FreeBalance = ::core::primitive::u64;
+                pub type FreeBalance = ::core::primitive::u128;
             }
             impl Endowed {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3342,7 +3341,7 @@ pub mod api {
             pub mod dust_lost {
                 use super::runtime_types;
                 pub type Account = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl DustLost {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3370,7 +3369,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type From = ::subxt::utils::AccountId32;
                 pub type To = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Transfer {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3396,7 +3395,7 @@ pub mod api {
             pub mod balance_set {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Free = ::core::primitive::u64;
+                pub type Free = ::core::primitive::u128;
             }
             impl BalanceSet {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3422,7 +3421,7 @@ pub mod api {
             pub mod reserved {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Reserved {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3448,7 +3447,7 @@ pub mod api {
             pub mod unreserved {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Unreserved {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3478,7 +3477,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type From = ::subxt::utils::AccountId32;
                 pub type To = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
                 pub type DestinationStatus =
                     runtime_types::frame_support::traits::tokens::misc::BalanceStatus;
             }
@@ -3506,7 +3505,7 @@ pub mod api {
             pub mod deposit {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Deposit {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3532,7 +3531,7 @@ pub mod api {
             pub mod withdraw {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Withdraw {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3558,7 +3557,7 @@ pub mod api {
             pub mod slashed {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Slashed {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3584,7 +3583,7 @@ pub mod api {
             pub mod minted {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Minted {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3608,7 +3607,7 @@ pub mod api {
             }
             pub mod minted_credit {
                 use super::runtime_types;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl MintedCredit {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3634,7 +3633,7 @@ pub mod api {
             pub mod burned {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Burned {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3658,7 +3657,7 @@ pub mod api {
             }
             pub mod burned_debt {
                 use super::runtime_types;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl BurnedDebt {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3684,7 +3683,7 @@ pub mod api {
             pub mod suspended {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Suspended {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3710,7 +3709,7 @@ pub mod api {
             pub mod restored {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Restored {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3758,7 +3757,7 @@ pub mod api {
             }
             pub mod issued {
                 use super::runtime_types;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Issued {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3782,7 +3781,7 @@ pub mod api {
             }
             pub mod rescinded {
                 use super::runtime_types;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Rescinded {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3808,7 +3807,7 @@ pub mod api {
             pub mod locked {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Locked {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3834,7 +3833,7 @@ pub mod api {
             pub mod unlocked {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Unlocked {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3860,7 +3859,7 @@ pub mod api {
             pub mod frozen {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Frozen {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3886,7 +3885,7 @@ pub mod api {
             pub mod thawed {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Thawed {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3911,8 +3910,8 @@ pub mod api {
             }
             pub mod total_issuance_forced {
                 use super::runtime_types;
-                pub type Old = ::core::primitive::u64;
-                pub type New = ::core::primitive::u64;
+                pub type Old = ::core::primitive::u128;
+                pub type New = ::core::primitive::u128;
             }
             impl TotalIssuanceForced {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3940,7 +3939,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type Reason = runtime_types::acuity_runtime::RuntimeHoldReason;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Held {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3968,7 +3967,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type Reason = runtime_types::acuity_runtime::RuntimeHoldReason;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl BurnedHeld {
                 const PALLET_NAME: &'static str = "Balances";
@@ -3998,7 +3997,7 @@ pub mod api {
                 pub type Reason = runtime_types::acuity_runtime::RuntimeHoldReason;
                 pub type Source = ::subxt::utils::AccountId32;
                 pub type Dest = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl TransferOnHold {
                 const PALLET_NAME: &'static str = "Balances";
@@ -4028,7 +4027,7 @@ pub mod api {
                 pub type Reason = runtime_types::acuity_runtime::RuntimeHoldReason;
                 pub type Source = ::subxt::utils::AccountId32;
                 pub type Dest = ::subxt::utils::AccountId32;
-                pub type Transferred = ::core::primitive::u64;
+                pub type Transferred = ::core::primitive::u128;
             }
             impl TransferAndHold {
                 const PALLET_NAME: &'static str = "Balances";
@@ -4056,7 +4055,7 @@ pub mod api {
                 use super::runtime_types;
                 pub type Reason = runtime_types::acuity_runtime::RuntimeHoldReason;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type Amount = ::core::primitive::u64;
+                pub type Amount = ::core::primitive::u128;
             }
             impl Released {
                 const PALLET_NAME: &'static str = "Balances";
@@ -4104,9 +4103,9 @@ pub mod api {
                         "Balances",
                         "TotalIssuance",
                         [
-                            255u8, 207u8, 65u8, 3u8, 202u8, 93u8, 254u8, 158u8, 33u8, 199u8, 95u8,
-                            186u8, 45u8, 147u8, 85u8, 143u8, 217u8, 92u8, 226u8, 164u8, 72u8, 82u8,
-                            168u8, 77u8, 242u8, 157u8, 16u8, 109u8, 213u8, 29u8, 224u8, 140u8,
+                            138u8, 120u8, 138u8, 119u8, 4u8, 166u8, 22u8, 216u8, 227u8, 249u8,
+                            161u8, 193u8, 54u8, 68u8, 55u8, 74u8, 230u8, 68u8, 131u8, 253u8, 146u8,
+                            73u8, 54u8, 85u8, 212u8, 83u8, 162u8, 188u8, 171u8, 5u8, 232u8, 21u8,
                         ],
                     )
                 }
@@ -4122,9 +4121,9 @@ pub mod api {
                         "Balances",
                         "InactiveIssuance",
                         [
-                            192u8, 166u8, 7u8, 92u8, 199u8, 45u8, 203u8, 233u8, 174u8, 85u8, 22u8,
-                            88u8, 35u8, 98u8, 88u8, 78u8, 37u8, 85u8, 191u8, 40u8, 9u8, 18u8, 47u8,
-                            154u8, 93u8, 249u8, 60u8, 28u8, 100u8, 10u8, 152u8, 233u8,
+                            97u8, 194u8, 82u8, 3u8, 40u8, 108u8, 109u8, 245u8, 175u8, 189u8, 212u8,
+                            193u8, 229u8, 82u8, 107u8, 169u8, 9u8, 176u8, 124u8, 102u8, 151u8,
+                            98u8, 87u8, 194u8, 82u8, 130u8, 41u8, 137u8, 3u8, 230u8, 145u8, 58u8,
                         ],
                     )
                 }
@@ -4163,9 +4162,10 @@ pub mod api {
                         "Balances",
                         "Account",
                         [
-                            236u8, 169u8, 26u8, 143u8, 125u8, 56u8, 42u8, 227u8, 28u8, 200u8, 53u8,
-                            4u8, 124u8, 58u8, 98u8, 68u8, 247u8, 231u8, 222u8, 130u8, 173u8, 230u8,
-                            18u8, 217u8, 183u8, 104u8, 175u8, 47u8, 149u8, 47u8, 218u8, 165u8,
+                            14u8, 88u8, 174u8, 192u8, 241u8, 142u8, 159u8, 255u8, 178u8, 117u8,
+                            55u8, 78u8, 218u8, 161u8, 146u8, 139u8, 170u8, 180u8, 187u8, 177u8,
+                            89u8, 157u8, 91u8, 225u8, 90u8, 174u8, 247u8, 47u8, 47u8, 23u8, 234u8,
+                            50u8,
                         ],
                     )
                 }
@@ -4184,10 +4184,10 @@ pub mod api {
                         "Balances",
                         "Locks",
                         [
-                            100u8, 180u8, 39u8, 29u8, 118u8, 11u8, 128u8, 147u8, 158u8, 25u8,
-                            108u8, 9u8, 147u8, 247u8, 231u8, 147u8, 227u8, 155u8, 169u8, 140u8,
-                            191u8, 37u8, 9u8, 114u8, 177u8, 1u8, 160u8, 159u8, 236u8, 180u8, 65u8,
-                            160u8,
+                            201u8, 50u8, 65u8, 126u8, 43u8, 153u8, 207u8, 145u8, 240u8, 59u8,
+                            160u8, 111u8, 144u8, 245u8, 193u8, 13u8, 227u8, 118u8, 72u8, 168u8,
+                            37u8, 147u8, 139u8, 221u8, 36u8, 177u8, 202u8, 209u8, 152u8, 122u8,
+                            250u8, 89u8,
                         ],
                     )
                 }
@@ -4205,10 +4205,10 @@ pub mod api {
                         "Balances",
                         "Reserves",
                         [
-                            174u8, 247u8, 186u8, 116u8, 129u8, 194u8, 102u8, 229u8, 108u8, 201u8,
-                            192u8, 157u8, 113u8, 3u8, 51u8, 116u8, 8u8, 184u8, 195u8, 49u8, 128u8,
-                            38u8, 51u8, 78u8, 169u8, 101u8, 41u8, 185u8, 135u8, 162u8, 217u8,
-                            222u8,
+                            242u8, 49u8, 250u8, 113u8, 214u8, 13u8, 201u8, 251u8, 161u8, 201u8,
+                            81u8, 43u8, 122u8, 155u8, 190u8, 214u8, 210u8, 26u8, 104u8, 107u8,
+                            113u8, 108u8, 113u8, 171u8, 174u8, 31u8, 169u8, 220u8, 98u8, 39u8,
+                            68u8, 245u8,
                         ],
                     )
                 }
@@ -4224,9 +4224,9 @@ pub mod api {
                         "Balances",
                         "Holds",
                         [
-                            144u8, 149u8, 242u8, 237u8, 106u8, 120u8, 122u8, 97u8, 184u8, 135u8,
-                            163u8, 153u8, 24u8, 70u8, 41u8, 59u8, 181u8, 52u8, 240u8, 146u8, 169u8,
-                            115u8, 163u8, 29u8, 24u8, 1u8, 221u8, 110u8, 77u8, 157u8, 212u8, 92u8,
+                            127u8, 213u8, 56u8, 163u8, 150u8, 56u8, 111u8, 121u8, 191u8, 137u8,
+                            59u8, 114u8, 75u8, 24u8, 70u8, 242u8, 138u8, 133u8, 215u8, 74u8, 230u8,
+                            129u8, 232u8, 84u8, 145u8, 55u8, 37u8, 63u8, 69u8, 59u8, 121u8, 243u8,
                         ],
                     )
                 }
@@ -4242,10 +4242,10 @@ pub mod api {
                         "Balances",
                         "Freezes",
                         [
-                            72u8, 192u8, 200u8, 223u8, 92u8, 211u8, 151u8, 71u8, 159u8, 209u8,
-                            132u8, 32u8, 184u8, 174u8, 108u8, 249u8, 233u8, 137u8, 160u8, 255u8,
-                            195u8, 31u8, 52u8, 180u8, 147u8, 124u8, 243u8, 116u8, 57u8, 129u8,
-                            14u8, 82u8,
+                            41u8, 196u8, 69u8, 26u8, 201u8, 141u8, 252u8, 255u8, 78u8, 216u8,
+                            102u8, 207u8, 133u8, 185u8, 86u8, 18u8, 79u8, 137u8, 132u8, 92u8,
+                            228u8, 237u8, 91u8, 125u8, 25u8, 111u8, 127u8, 212u8, 215u8, 114u8,
+                            219u8, 72u8,
                         ],
                     )
                 }
@@ -4256,7 +4256,7 @@ pub mod api {
                 pub mod input {
                     use super::runtime_types;
                 }
-                pub type Output = ::core::primitive::u64;
+                pub type Output = ::core::primitive::u128;
             }
             pub mod inactive_issuance {
                 use super::root_mod;
@@ -4264,7 +4264,7 @@ pub mod api {
                 pub mod input {
                     use super::runtime_types;
                 }
-                pub type Output = ::core::primitive::u64;
+                pub type Output = ::core::primitive::u128;
             }
             pub mod account {
                 use super::root_mod;
@@ -4274,7 +4274,7 @@ pub mod api {
                     pub type Param0 = ::subxt::utils::AccountId32;
                 }
                 pub type Output =
-                    runtime_types::pallet_balances::types::AccountData<::core::primitive::u64>;
+                    runtime_types::pallet_balances::types::AccountData<::core::primitive::u128>;
             }
             pub mod locks {
                 use super::root_mod;
@@ -4285,7 +4285,7 @@ pub mod api {
                 }
                 pub type Output =
                     runtime_types::bounded_collections::weak_bounded_vec::WeakBoundedVec<
-                        runtime_types::pallet_balances::types::BalanceLock<::core::primitive::u64>,
+                        runtime_types::pallet_balances::types::BalanceLock<::core::primitive::u128>,
                     >;
             }
             pub mod reserves {
@@ -4296,7 +4296,7 @@ pub mod api {
                     pub type Param0 = ::subxt::utils::AccountId32;
                 }
                 pub type Output = runtime_types::bounded_collections::bounded_vec::BoundedVec<
-                    runtime_types::pallet_balances::types::ReserveData<(), ::core::primitive::u64>,
+                    runtime_types::pallet_balances::types::ReserveData<(), ::core::primitive::u128>,
                 >;
             }
             pub mod holds {
@@ -4309,7 +4309,7 @@ pub mod api {
                 pub type Output = runtime_types::bounded_collections::bounded_vec::BoundedVec<
                     runtime_types::frame_support::traits::tokens::misc::IdAmount<
                         runtime_types::acuity_runtime::RuntimeHoldReason,
-                        ::core::primitive::u64,
+                        ::core::primitive::u128,
                     >,
                 >;
             }
@@ -4323,7 +4323,7 @@ pub mod api {
                 pub type Output = runtime_types::bounded_collections::bounded_vec::BoundedVec<
                     runtime_types::frame_support::traits::tokens::misc::IdAmount<
                         (),
-                        ::core::primitive::u64,
+                        ::core::primitive::u128,
                     >,
                 >;
             }
@@ -4342,15 +4342,14 @@ pub mod api {
                 #[doc = " Bottom line: Do yourself a favour and make it at least one!"]
                 pub fn existential_deposit(
                     &self,
-                ) -> ::subxt::constants::StaticAddress<::core::primitive::u64> {
+                ) -> ::subxt::constants::StaticAddress<::core::primitive::u128> {
                     ::subxt::constants::StaticAddress::new_static(
                         "Balances",
                         "ExistentialDeposit",
                         [
-                            128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-                            59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-                            103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-                            246u8,
+                            84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+                            27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+                            136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
                         ],
                     )
                 }
@@ -4560,10 +4559,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                46u8, 251u8, 250u8, 106u8, 117u8, 234u8, 135u8, 238u8, 144u8,
-                                233u8, 200u8, 77u8, 110u8, 59u8, 109u8, 81u8, 34u8, 52u8, 82u8,
-                                9u8, 153u8, 90u8, 27u8, 229u8, 3u8, 214u8, 175u8, 22u8, 147u8,
-                                70u8, 219u8, 203u8,
+                                57u8, 195u8, 249u8, 69u8, 133u8, 240u8, 69u8, 4u8, 132u8, 50u8,
+                                147u8, 150u8, 41u8, 27u8, 251u8, 169u8, 222u8, 248u8, 229u8, 136u8,
+                                124u8, 226u8, 123u8, 68u8, 239u8, 232u8, 180u8, 9u8, 71u8, 124u8,
+                                222u8, 243u8,
                             ],
                         )
                     }
@@ -4586,10 +4585,10 @@ pub mod api {
                                 weight,
                             },
                             [
-                                51u8, 157u8, 255u8, 101u8, 9u8, 29u8, 131u8, 49u8, 96u8, 237u8,
-                                187u8, 115u8, 53u8, 114u8, 78u8, 56u8, 247u8, 9u8, 83u8, 127u8,
-                                61u8, 89u8, 146u8, 97u8, 113u8, 142u8, 10u8, 116u8, 120u8, 47u8,
-                                240u8, 252u8,
+                                116u8, 123u8, 31u8, 149u8, 52u8, 62u8, 176u8, 9u8, 33u8, 6u8,
+                                164u8, 113u8, 190u8, 68u8, 73u8, 208u8, 61u8, 108u8, 48u8, 151u8,
+                                232u8, 38u8, 223u8, 127u8, 141u8, 158u8, 55u8, 167u8, 221u8, 253u8,
+                                139u8, 77u8,
                             ],
                         )
                     }
@@ -4628,10 +4627,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                205u8, 113u8, 34u8, 238u8, 106u8, 205u8, 171u8, 79u8, 151u8, 219u8,
-                                177u8, 253u8, 42u8, 136u8, 182u8, 203u8, 150u8, 28u8, 163u8, 206u8,
-                                224u8, 76u8, 222u8, 102u8, 29u8, 159u8, 119u8, 38u8, 166u8, 131u8,
-                                32u8, 22u8,
+                                234u8, 157u8, 140u8, 164u8, 233u8, 113u8, 14u8, 57u8, 203u8, 252u8,
+                                35u8, 25u8, 149u8, 11u8, 210u8, 38u8, 170u8, 77u8, 235u8, 207u8,
+                                67u8, 95u8, 178u8, 214u8, 21u8, 139u8, 27u8, 13u8, 111u8, 155u8,
+                                210u8, 27u8,
                             ],
                         )
                     }
@@ -4812,8 +4811,8 @@ pub mod api {
             pub mod transaction_fee_paid {
                 use super::runtime_types;
                 pub type Who = ::subxt::utils::AccountId32;
-                pub type ActualFee = ::core::primitive::u64;
-                pub type Tip = ::core::primitive::u64;
+                pub type ActualFee = ::core::primitive::u128;
+                pub type Tip = ::core::primitive::u128;
             }
             impl TransactionFeePaid {
                 const PALLET_NAME: &'static str = "TransactionPayment";
@@ -4876,10 +4875,9 @@ pub mod api {
                         "TransactionPayment",
                         "TxPaymentCredit",
                         [
-                            220u8, 66u8, 162u8, 55u8, 149u8, 35u8, 127u8, 151u8, 145u8, 173u8,
-                            148u8, 192u8, 196u8, 208u8, 177u8, 103u8, 167u8, 105u8, 105u8, 174u8,
-                            68u8, 70u8, 159u8, 34u8, 142u8, 11u8, 128u8, 155u8, 239u8, 249u8,
-                            201u8, 52u8,
+                            200u8, 46u8, 84u8, 207u8, 2u8, 81u8, 201u8, 150u8, 218u8, 189u8, 138u8,
+                            151u8, 91u8, 194u8, 144u8, 2u8, 28u8, 38u8, 88u8, 233u8, 242u8, 207u8,
+                            20u8, 172u8, 99u8, 167u8, 57u8, 12u8, 121u8, 0u8, 162u8, 148u8,
                         ],
                     )
                 }
@@ -4908,7 +4906,7 @@ pub mod api {
                 }
                 pub type Output = runtime_types::frame_support::traits::storage::NoDrop<
                     runtime_types::frame_support::traits::tokens::fungible::imbalance::Imbalance<
-                        ::core::primitive::u64,
+                        ::core::primitive::u128,
                     >,
                 >;
             }
@@ -6384,10 +6382,10 @@ pub mod api {
                             "batch",
                             super::Batch { calls },
                             [
-                                200u8, 18u8, 201u8, 170u8, 43u8, 170u8, 247u8, 64u8, 217u8, 64u8,
-                                57u8, 151u8, 188u8, 86u8, 33u8, 116u8, 144u8, 112u8, 222u8, 69u8,
-                                239u8, 33u8, 230u8, 70u8, 4u8, 233u8, 126u8, 176u8, 186u8, 132u8,
-                                45u8, 200u8,
+                                95u8, 72u8, 25u8, 209u8, 4u8, 177u8, 178u8, 185u8, 135u8, 59u8,
+                                166u8, 112u8, 103u8, 246u8, 239u8, 243u8, 239u8, 127u8, 44u8,
+                                141u8, 83u8, 86u8, 194u8, 108u8, 58u8, 11u8, 144u8, 33u8, 242u8,
+                                188u8, 30u8, 13u8,
                             ],
                         )
                     }
@@ -6418,9 +6416,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                101u8, 74u8, 0u8, 120u8, 26u8, 71u8, 165u8, 2u8, 80u8, 10u8, 50u8,
-                                32u8, 20u8, 44u8, 206u8, 87u8, 27u8, 7u8, 84u8, 154u8, 15u8, 6u8,
-                                43u8, 150u8, 242u8, 12u8, 156u8, 81u8, 238u8, 170u8, 216u8, 67u8,
+                                123u8, 153u8, 72u8, 88u8, 5u8, 3u8, 44u8, 100u8, 28u8, 85u8, 100u8,
+                                209u8, 255u8, 69u8, 204u8, 97u8, 78u8, 201u8, 63u8, 171u8, 14u8,
+                                151u8, 85u8, 26u8, 247u8, 108u8, 175u8, 64u8, 134u8, 64u8, 113u8,
+                                204u8,
                             ],
                         )
                     }
@@ -6446,10 +6445,10 @@ pub mod api {
                             "batch_all",
                             super::BatchAll { calls },
                             [
-                                13u8, 97u8, 12u8, 193u8, 243u8, 184u8, 117u8, 243u8, 65u8, 84u8,
-                                211u8, 122u8, 161u8, 167u8, 50u8, 143u8, 153u8, 70u8, 42u8, 215u8,
-                                150u8, 72u8, 113u8, 252u8, 199u8, 77u8, 174u8, 154u8, 112u8, 51u8,
-                                178u8, 60u8,
+                                90u8, 149u8, 140u8, 124u8, 5u8, 226u8, 39u8, 236u8, 39u8, 189u8,
+                                79u8, 215u8, 193u8, 93u8, 150u8, 61u8, 139u8, 30u8, 167u8, 96u8,
+                                183u8, 76u8, 135u8, 120u8, 122u8, 165u8, 2u8, 10u8, 83u8, 122u8,
+                                83u8, 33u8,
                             ],
                         )
                     }
@@ -6473,10 +6472,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                184u8, 153u8, 105u8, 154u8, 72u8, 46u8, 170u8, 187u8, 134u8, 78u8,
-                                174u8, 170u8, 1u8, 48u8, 23u8, 183u8, 26u8, 249u8, 215u8, 227u8,
-                                232u8, 122u8, 38u8, 161u8, 107u8, 28u8, 120u8, 99u8, 217u8, 3u8,
-                                88u8, 217u8,
+                                81u8, 37u8, 80u8, 168u8, 27u8, 5u8, 207u8, 172u8, 217u8, 145u8,
+                                135u8, 50u8, 1u8, 109u8, 109u8, 21u8, 126u8, 194u8, 174u8, 153u8,
+                                151u8, 200u8, 152u8, 112u8, 33u8, 132u8, 20u8, 69u8, 77u8, 206u8,
+                                229u8, 186u8,
                             ],
                         )
                     }
@@ -6503,10 +6502,10 @@ pub mod api {
                             "force_batch",
                             super::ForceBatch { calls },
                             [
-                                243u8, 29u8, 195u8, 109u8, 75u8, 131u8, 158u8, 70u8, 51u8, 56u8,
-                                218u8, 63u8, 56u8, 158u8, 12u8, 147u8, 150u8, 150u8, 15u8, 243u8,
-                                125u8, 204u8, 152u8, 105u8, 233u8, 129u8, 171u8, 230u8, 239u8,
-                                243u8, 122u8, 166u8,
+                                81u8, 157u8, 192u8, 104u8, 255u8, 68u8, 202u8, 119u8, 68u8, 23u8,
+                                151u8, 250u8, 128u8, 106u8, 97u8, 192u8, 142u8, 62u8, 196u8, 153u8,
+                                190u8, 28u8, 224u8, 143u8, 213u8, 5u8, 20u8, 81u8, 13u8, 54u8,
+                                253u8, 63u8,
                             ],
                         )
                     }
@@ -6530,10 +6529,10 @@ pub mod api {
                                 weight,
                             },
                             [
-                                143u8, 183u8, 124u8, 244u8, 254u8, 246u8, 154u8, 83u8, 144u8,
-                                117u8, 117u8, 175u8, 31u8, 175u8, 23u8, 100u8, 17u8, 142u8, 92u8,
-                                120u8, 94u8, 179u8, 207u8, 222u8, 174u8, 176u8, 93u8, 26u8, 226u8,
-                                140u8, 44u8, 131u8,
+                                78u8, 255u8, 58u8, 252u8, 172u8, 93u8, 211u8, 54u8, 3u8, 85u8,
+                                25u8, 74u8, 114u8, 190u8, 220u8, 125u8, 122u8, 211u8, 124u8, 160u8,
+                                138u8, 213u8, 91u8, 85u8, 175u8, 120u8, 75u8, 233u8, 65u8, 195u8,
+                                21u8, 174u8,
                             ],
                         )
                     }
@@ -6573,10 +6572,10 @@ pub mod api {
                                 fallback: ::subxt::alloc::boxed::Box::new(fallback),
                             },
                             [
-                                228u8, 165u8, 184u8, 155u8, 134u8, 171u8, 207u8, 71u8, 138u8,
-                                188u8, 21u8, 236u8, 212u8, 26u8, 180u8, 52u8, 228u8, 175u8, 63u8,
-                                164u8, 228u8, 81u8, 44u8, 247u8, 6u8, 115u8, 107u8, 101u8, 191u8,
-                                83u8, 254u8, 49u8,
+                                45u8, 246u8, 103u8, 154u8, 221u8, 4u8, 181u8, 132u8, 40u8, 30u8,
+                                72u8, 253u8, 84u8, 187u8, 69u8, 187u8, 211u8, 163u8, 105u8, 33u8,
+                                163u8, 214u8, 2u8, 147u8, 15u8, 31u8, 69u8, 62u8, 198u8, 158u8,
+                                59u8, 174u8,
                             ],
                         )
                     }
@@ -6599,10 +6598,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                123u8, 139u8, 52u8, 5u8, 113u8, 118u8, 202u8, 145u8, 99u8, 148u8,
-                                115u8, 3u8, 153u8, 49u8, 119u8, 107u8, 211u8, 186u8, 157u8, 112u8,
-                                3u8, 88u8, 13u8, 96u8, 93u8, 195u8, 47u8, 191u8, 82u8, 43u8, 98u8,
-                                75u8,
+                                194u8, 40u8, 57u8, 132u8, 26u8, 183u8, 55u8, 162u8, 199u8, 175u8,
+                                165u8, 30u8, 251u8, 215u8, 255u8, 89u8, 77u8, 13u8, 93u8, 25u8,
+                                17u8, 144u8, 175u8, 223u8, 216u8, 17u8, 198u8, 24u8, 249u8, 61u8,
+                                80u8, 194u8,
                             ],
                         )
                     }
@@ -7645,7 +7644,7 @@ pub mod api {
                     transfer_allow_death {
                         dest: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
                         #[codec(compact)]
-                        value: ::core::primitive::u64,
+                        value: ::core::primitive::u128,
                     },
                     #[codec(index = 2)]
                     #[doc = "Exactly as `transfer_allow_death`, except the origin must be root and the source account"]
@@ -7654,7 +7653,7 @@ pub mod api {
                         source: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
                         dest: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
                         #[codec(compact)]
-                        value: ::core::primitive::u64,
+                        value: ::core::primitive::u128,
                     },
                     #[codec(index = 3)]
                     #[doc = "Same as the [`transfer_allow_death`] call, but with a check that the transfer will not"]
@@ -7666,7 +7665,7 @@ pub mod api {
                     transfer_keep_alive {
                         dest: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
                         #[codec(compact)]
-                        value: ::core::primitive::u64,
+                        value: ::core::primitive::u128,
                     },
                     #[codec(index = 4)]
                     #[doc = "Transfer the entire transferable balance from the caller account."]
@@ -7694,7 +7693,7 @@ pub mod api {
                     #[doc = "Can only be called by ROOT."]
                     force_unreserve {
                         who: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 6)]
                     #[doc = "Upgrade a specified account."]
@@ -7715,7 +7714,7 @@ pub mod api {
                     force_set_balance {
                         who: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
                         #[codec(compact)]
-                        new_free: ::core::primitive::u64,
+                        new_free: ::core::primitive::u128,
                     },
                     #[codec(index = 9)]
                     #[doc = "Adjust the total issuance in a saturating way."]
@@ -7726,7 +7725,7 @@ pub mod api {
                     force_adjust_total_issuance {
                         direction: runtime_types::pallet_balances::types::AdjustmentDirection,
                         #[codec(compact)]
-                        delta: ::core::primitive::u64,
+                        delta: ::core::primitive::u128,
                     },
                     #[codec(index = 10)]
                     #[doc = "Burn the specified liquid free balance from the origin account."]
@@ -7738,7 +7737,7 @@ pub mod api {
                     #[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
                     burn {
                         #[codec(compact)]
-                        value: ::core::primitive::u64,
+                        value: ::core::primitive::u128,
                         keep_alive: ::core::primitive::bool,
                     },
                 }
@@ -7801,39 +7800,39 @@ pub mod api {
                     #[doc = "An account was created with some free balance."]
                     Endowed {
                         account: ::subxt::utils::AccountId32,
-                        free_balance: ::core::primitive::u64,
+                        free_balance: ::core::primitive::u128,
                     },
                     #[codec(index = 1)]
                     #[doc = "An account was removed whose balance was non-zero but below ExistentialDeposit,"]
                     #[doc = "resulting in an outright loss."]
                     DustLost {
                         account: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 2)]
                     #[doc = "Transfer succeeded."]
                     Transfer {
                         from: ::subxt::utils::AccountId32,
                         to: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 3)]
                     #[doc = "A balance was set by root."]
                     BalanceSet {
                         who: ::subxt::utils::AccountId32,
-                        free: ::core::primitive::u64,
+                        free: ::core::primitive::u128,
                     },
                     #[codec(index = 4)]
                     #[doc = "Some balance was reserved (moved from free to reserved)."]
                     Reserved {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 5)]
                     #[doc = "Some balance was unreserved (moved from reserved to free)."]
                     Unreserved {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 6)]
                     #[doc = "Some balance was moved from the reserve of the first account to the second account."]
@@ -7841,7 +7840,7 @@ pub mod api {
                     ReserveRepatriated {
                         from: ::subxt::utils::AccountId32,
                         to: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                         destination_status:
                             runtime_types::frame_support::traits::tokens::misc::BalanceStatus,
                     },
@@ -7849,102 +7848,102 @@ pub mod api {
                     #[doc = "Some amount was deposited (e.g. for transaction fees)."]
                     Deposit {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 8)]
                     #[doc = "Some amount was withdrawn from the account (e.g. for transaction fees)."]
                     Withdraw {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 9)]
                     #[doc = "Some amount was removed from the account (e.g. for misbehavior)."]
                     Slashed {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 10)]
                     #[doc = "Some amount was minted into an account."]
                     Minted {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 11)]
                     #[doc = "Some credit was balanced and added to the TotalIssuance."]
-                    MintedCredit { amount: ::core::primitive::u64 },
+                    MintedCredit { amount: ::core::primitive::u128 },
                     #[codec(index = 12)]
                     #[doc = "Some amount was burned from an account."]
                     Burned {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 13)]
                     #[doc = "Some debt has been dropped from the Total Issuance."]
-                    BurnedDebt { amount: ::core::primitive::u64 },
+                    BurnedDebt { amount: ::core::primitive::u128 },
                     #[codec(index = 14)]
                     #[doc = "Some amount was suspended from an account (it can be restored later)."]
                     Suspended {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 15)]
                     #[doc = "Some amount was restored into an account."]
                     Restored {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 16)]
                     #[doc = "An account was upgraded."]
                     Upgraded { who: ::subxt::utils::AccountId32 },
                     #[codec(index = 17)]
                     #[doc = "Total issuance was increased by `amount`, creating a credit to be balanced."]
-                    Issued { amount: ::core::primitive::u64 },
+                    Issued { amount: ::core::primitive::u128 },
                     #[codec(index = 18)]
                     #[doc = "Total issuance was decreased by `amount`, creating a debt to be balanced."]
-                    Rescinded { amount: ::core::primitive::u64 },
+                    Rescinded { amount: ::core::primitive::u128 },
                     #[codec(index = 19)]
                     #[doc = "Some balance was locked."]
                     Locked {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 20)]
                     #[doc = "Some balance was unlocked."]
                     Unlocked {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 21)]
                     #[doc = "Some balance was frozen."]
                     Frozen {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 22)]
                     #[doc = "Some balance was thawed."]
                     Thawed {
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 23)]
                     #[doc = "The `TotalIssuance` was forcefully changed."]
                     TotalIssuanceForced {
-                        old: ::core::primitive::u64,
-                        new: ::core::primitive::u64,
+                        old: ::core::primitive::u128,
+                        new: ::core::primitive::u128,
                     },
                     #[codec(index = 24)]
                     #[doc = "Some balance was placed on hold."]
                     Held {
                         reason: runtime_types::acuity_runtime::RuntimeHoldReason,
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 25)]
                     #[doc = "Held balance was burned from an account."]
                     BurnedHeld {
                         reason: runtime_types::acuity_runtime::RuntimeHoldReason,
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 26)]
                     #[doc = "A transfer of `amount` on hold from `source` to `dest` was initiated."]
@@ -7952,7 +7951,7 @@ pub mod api {
                         reason: runtime_types::acuity_runtime::RuntimeHoldReason,
                         source: ::subxt::utils::AccountId32,
                         dest: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 27)]
                     #[doc = "The `transferred` balance is placed on hold at the `dest` account."]
@@ -7960,14 +7959,14 @@ pub mod api {
                         reason: runtime_types::acuity_runtime::RuntimeHoldReason,
                         source: ::subxt::utils::AccountId32,
                         dest: ::subxt::utils::AccountId32,
-                        transferred: ::core::primitive::u64,
+                        transferred: ::core::primitive::u128,
                     },
                     #[codec(index = 28)]
                     #[doc = "Some balance was released from hold."]
                     Released {
                         reason: runtime_types::acuity_runtime::RuntimeHoldReason,
                         who: ::subxt::utils::AccountId32,
-                        amount: ::core::primitive::u64,
+                        amount: ::core::primitive::u128,
                     },
                     #[codec(index = 29)]
                     #[doc = "An unexpected/defensive event was triggered."]
@@ -8508,8 +8507,8 @@ pub mod api {
                     #[doc = "has been paid by `who`."]
                     TransactionFeePaid {
                         who: ::subxt::utils::AccountId32,
-                        actual_fee: ::core::primitive::u64,
-                        tip: ::core::primitive::u64,
+                        actual_fee: ::core::primitive::u128,
+                        tip: ::core::primitive::u128,
                     },
                 }
             }
@@ -8560,7 +8559,7 @@ pub mod api {
             )]
             #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
             #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-            pub struct ChargeTransactionPayment(#[codec(compact)] pub ::core::primitive::u64);
+            pub struct ChargeTransactionPayment(#[codec(compact)] pub ::core::primitive::u128);
             #[derive(
                 :: subxt :: ext :: scale_decode :: DecodeAsType,
                 :: subxt :: ext :: scale_encode :: EncodeAsType,
