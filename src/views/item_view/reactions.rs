@@ -1,6 +1,7 @@
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
+    content::{bytes32_to_hex, fetch_events_for_item, is_content_reactions_event},
     runtime_client::{connect as connect_acuity_client, estimate_fee},
     ChainConnection,
 };
@@ -11,77 +12,93 @@ use std::collections::HashMap;
 use super::types::{AVAILABLE_EMOJI_CODEPOINTS, ReactionSummary};
 use crate::views::components::InsufficientFundsHint;
 
-/// Fetches all reactions for a given `(item_id, revision_id)` by iterating
-/// the `ContentReactions::ItemAccountReactions` storage map with a 2-key
-/// prefix.  Each entry maps one reactor account to its set of emoji reactions.
-pub async fn fetch_reactions(
-    item_id: [u8; 32],
+fn hex_to_ss58(hex: &str) -> Option<String> {
+    let bytes = crate::content::hex_to_bytes32(hex).ok()?;
+    let account = sp_core::crypto::AccountId32::from(bytes);
+    Some(account.to_ss58check())
+}
+
+fn parse_u32_from_value(value: &serde_json::Value) -> Option<u32> {
+    value
+        .as_u64()
+        .and_then(|v| u32::try_from(v).ok())
+        .or_else(|| value.as_str().and_then(|s| s.parse::<u32>().ok()))
+}
+
+fn parse_reactions_from_event(reactions_value: &serde_json::Value) -> Vec<u32> {
+    reactions_value
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| parse_u32_from_value(v))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+async fn fetch_reactions_from_indexer(
+    item_id_hex: String,
     revision_id: u32,
     active_address: Option<String>,
 ) -> Result<Vec<ReactionSummary>, String> {
-    let client = connect_acuity_client().await?;
-    let at_block = client
-        .at_current_block()
-        .await
-        .map_err(|error| format!("Failed to access latest block for reactions: {error}"))?;
+    let decoded_events = fetch_events_for_item(item_id_hex).await?;
 
-    let storage_addr = api::storage().content_reactions().item_account_reactions();
+    let mut reactor_latest: HashMap<String, (u32, u16, Vec<u32>)> = HashMap::new();
 
-    let mut entries = at_block
-        .storage()
-        .iter(
-            storage_addr,
-            (
-                api::runtime_types::pallet_content::pallet::ItemId(item_id),
-                revision_id,
-            ),
-        )
-        .await
-        .map_err(|error| format!("Failed to start reactions storage iteration: {error}"))?;
+    for event in &decoded_events {
+        if !is_content_reactions_event(event, "SetReactions") {
+            continue;
+        }
 
-    // Map from codepoint → (count, reactors, i_reacted)
-    let mut map: HashMap<u32, (usize, Vec<String>, bool)> = HashMap::new();
+        let event_rev_id = event
+            .field("revision_id")
+            .and_then(|v| parse_u32_from_value(v))
+            .unwrap_or(u32::MAX);
 
-    while let Some(result) = entries.next().await {
-        let entry = result.map_err(|error| format!("Failed to read reaction entry: {error}"))?;
+        if event_rev_id != revision_id {
+            continue;
+        }
 
-        // Decode the reactor AccountId32 from the last 32 bytes of the storage key.
-        // For Blake2_128Concat keys the layout is: 16-byte hash || raw key bytes.
-        // The third key component (AccountId32) occupies the last 32 raw bytes.
-        let key_bytes = entry.key_bytes();
-        let reactor_address = if key_bytes.len() >= 32 {
-            let start = key_bytes.len() - 32;
-            let account_bytes: [u8; 32] = key_bytes[start..].try_into().unwrap_or([0u8; 32]);
-            let sp_account = sp_core::crypto::AccountId32::from(account_bytes);
-            sp_account.to_ss58check()
-        } else {
-            String::new()
+        let reactor_hex = match event.field("reactor").and_then(serde_json::Value::as_str) {
+            Some(h) => h.to_string(),
+            None => continue,
         };
 
-        let emojis = entry
-            .value()
-            .decode()
-            .map_err(|error| format!("Failed to decode emoji list: {error}"))?;
+        let reactions = event
+            .field("reactions")
+            .map(|v| parse_reactions_from_event(v))
+            .unwrap_or_default();
 
-        let i_am_reactor = active_address
+        let block = event.block_number;
+        let index = event.event_index;
+
+        let entry = reactor_latest.entry(reactor_hex).or_insert((0, 0, Vec::new()));
+        if (block, index) > (entry.0, entry.1) {
+            *entry = (block, index, reactions);
+        }
+    }
+
+    let mut map: HashMap<u32, (usize, Vec<String>, bool)> = HashMap::new();
+
+    for (reactor_hex, (_block, _index, reactions)) in reactor_latest {
+        let reactor_ss58 = hex_to_ss58(&reactor_hex).unwrap_or_default();
+        let is_me = active_address
             .as_deref()
-            .map(|addr| addr == reactor_address)
+            .map(|addr| addr == reactor_ss58)
             .unwrap_or(false);
 
-        for emoji in &emojis.0 {
-            let codepoint = emoji.0;
+        for codepoint in reactions {
             let entry = map.entry(codepoint).or_insert((0, Vec::new(), false));
             entry.0 += 1;
-            if !reactor_address.is_empty() {
-                entry.1.push(reactor_address.clone());
+            if !reactor_ss58.is_empty() {
+                entry.1.push(reactor_ss58.clone());
             }
-            if i_am_reactor {
+            if is_me {
                 entry.2 = true;
             }
         }
     }
 
-    // Build sorted output (preserve AVAILABLE_EMOJI_CODEPOINTS order first, then unknowns).
     let mut summaries: Vec<ReactionSummary> = map
         .into_iter()
         .filter_map(|(codepoint, (count, reactors, i_reacted))| {
@@ -106,7 +123,57 @@ pub async fn fetch_reactions(
     Ok(summaries)
 }
 
-// ── Reactions component ───────────────────────────────────────────────────────
+fn optimistic_update(
+    current: &[ReactionSummary],
+    active_address: &str,
+    new_set: &[u32],
+) -> Vec<ReactionSummary> {
+    let mut map: HashMap<u32, (usize, Vec<String>, bool)> = HashMap::new();
+
+    for r in current {
+        let others: Vec<String> = r
+            .reactors
+            .iter()
+            .filter(|addr| *addr != active_address)
+            .cloned()
+            .collect();
+        if !others.is_empty() {
+            let entry = map.entry(r.codepoint).or_default();
+            entry.0 += others.len();
+            entry.1.extend(others);
+        }
+    }
+
+    for &cp in new_set {
+        let entry = map.entry(cp).or_default();
+        entry.0 += 1;
+        entry.1.push(active_address.to_string());
+        entry.2 = true;
+    }
+
+    let mut summaries: Vec<ReactionSummary> = map
+        .into_iter()
+        .filter_map(|(codepoint, (count, reactors, i_reacted))| {
+            let emoji_char = char::from_u32(codepoint)?.to_string();
+            Some(ReactionSummary {
+                emoji_char,
+                codepoint,
+                count,
+                reactors,
+                i_reacted,
+            })
+        })
+        .collect();
+
+    summaries.sort_by_key(|r| {
+        AVAILABLE_EMOJI_CODEPOINTS
+            .iter()
+            .position(|&c| c == r.codepoint)
+            .unwrap_or(usize::MAX)
+    });
+
+    summaries
+}
 
 #[component]
 pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
@@ -119,17 +186,18 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
     let mut show_picker = use_signal(|| false);
     let mut is_submitting = use_signal(|| false);
     let mut tx_error: Signal<Option<String>> = use_signal(|| None);
-    let mut reload_tick = use_signal(|| 0_u64);
+    let reload_tick = use_signal(|| 0_u64);
 
-    // Fee estimation for add_reaction (representative cost for all reaction txs).
     let reaction_fee_estimate = use_resource(move || async move {
         let signer = account_store().active_signer().cloned()?;
-        // Use a dummy emoji codepoint (0x1F44D = 👍) for the estimate.
-        let dummy_emoji = api::runtime_types::pallet_content_reactions::pallet::Emoji(0x1F44D);
-        let call = api::tx().content_reactions().add_reaction(
+        let dummy_reactions =
+            api::runtime_types::bounded_collections::bounded_vec::BoundedVec(vec![
+                api::runtime_types::pallet_content_reactions::pallet::Emoji(0x1F44D),
+            ]);
+        let call = api::tx().content_reactions().set_reactions(
             api::runtime_types::pallet_content::pallet::ItemId(item_id),
             revision_id(),
-            dummy_emoji,
+            dummy_reactions,
         );
         estimate_fee(&call, &signer).await.ok()
     });
@@ -139,21 +207,21 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
         let fee = reaction_fee_estimate().flatten();
         match (balance, fee) {
             (Some(b), Some(f)) => b < f,
-            _ => true, // block until both balance and fee are known
+            _ => true,
         }
     });
 
-    // Load reactions whenever item_id, revision_id, or reload_tick changes.
     use_effect(move || {
         let _tick = reload_tick();
         let revision_id = revision_id();
         let active_address = account_store()
             .active_account()
             .map(|a| a.address.clone());
+        let item_id_hex = bytes32_to_hex(&item_id);
         spawn(async move {
             reactions_loading.set(true);
             reactions_error.set(None);
-            match fetch_reactions(item_id, revision_id, active_address).await {
+            match fetch_reactions_from_indexer(item_id_hex, revision_id, active_address).await {
                 Ok(r) => reactions.set(r),
                 Err(e) => reactions_error.set(Some(e)),
             }
@@ -161,8 +229,28 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
         });
     });
 
-    // Helper: submit a transaction (add or remove reaction).
-    let mut submit_tx = move |codepoint: u32, remove: bool| {
+    let is_unlocked = {
+        let store = account_store();
+        store
+            .active_account_id
+            .as_deref()
+            .map(|id| store.unlocked_signers.contains_key(id))
+            .unwrap_or(false)
+    };
+
+    let current_user_codepoints: Vec<u32> = reactions()
+        .iter()
+        .filter(|r| r.i_reacted)
+        .map(|r| r.codepoint)
+        .collect();
+
+    let picker_emojis: Vec<(u32, String)> = AVAILABLE_EMOJI_CODEPOINTS
+        .iter()
+        .filter(|&&cp| !current_user_codepoints.contains(&cp))
+        .filter_map(|&cp| Some((cp, char::from_u32(cp)?.to_string())))
+        .collect();
+
+    let mut toggle_emoji = move |codepoint: u32| {
         let store_snap = account_store();
         let signer = store_snap
             .active_account_id
@@ -170,17 +258,37 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
             .and_then(|id| store_snap.unlocked_signers.get(id))
             .cloned();
         let Some(signer) = signer else {
-            tx_error.set(Some(
-                "Unlock the active account to react.".to_string(),
-            ));
+            tx_error.set(Some("Unlock the active account to react.".to_string()));
             return;
         };
-        let revision_id = revision_id();
+        let active_address = store_snap
+            .active_account()
+            .map(|a| a.address.clone())
+            .unwrap_or_default();
+
+        let mut new_set: Vec<u32> = reactions()
+            .iter()
+            .filter(|r| r.i_reacted)
+            .map(|r| r.codepoint)
+            .collect();
+
+        if new_set.contains(&codepoint) {
+            new_set.retain(|&cp| cp != codepoint);
+        } else {
+            new_set.push(codepoint);
+            new_set.sort();
+        }
+
+        let old_reactions = reactions();
+        let updated = optimistic_update(&old_reactions, &active_address, &new_set);
+        reactions.set(updated);
+
+        let rev_id = revision_id();
+        show_picker.set(false);
 
         spawn(async move {
             is_submitting.set(true);
             tx_error.set(None);
-            show_picker.set(false);
 
             let result: Result<(), String> = async {
                 let client = connect_acuity_client().await?;
@@ -191,75 +299,56 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
 
                 let item_id_param =
                     api::runtime_types::pallet_content::pallet::ItemId(item_id);
-                let emoji_param =
-                    api::runtime_types::pallet_content_reactions::pallet::Emoji(codepoint);
+                let reactions_param =
+                    api::runtime_types::bounded_collections::bounded_vec::BoundedVec(
+                        new_set
+                            .iter()
+                            .map(|&cp| {
+                                api::runtime_types::pallet_content_reactions::pallet::Emoji(cp)
+                            })
+                            .collect(),
+                    );
 
-                if remove {
-                    at_block
-                        .tx()
-                        .sign_and_submit_then_watch_default(
-                            &api::tx()
-                                .content_reactions()
-                                .remove_reaction(item_id_param, revision_id, emoji_param),
-                            &signer,
-                        )
-                        .await
-                        .map_err(|e| format!("Failed to submit reaction: {e}"))?
-                        .wait_for_finalized_success()
-                        .await
-                        .map_err(|e| format!("Reaction transaction failed: {e}"))?;
-                } else {
-                    at_block
-                        .tx()
-                        .sign_and_submit_then_watch_default(
-                            &api::tx()
-                                .content_reactions()
-                                .add_reaction(item_id_param, revision_id, emoji_param),
-                            &signer,
-                        )
-                        .await
-                        .map_err(|e| format!("Failed to submit reaction: {e}"))?
-                        .wait_for_finalized_success()
-                        .await
-                        .map_err(|e| format!("Reaction transaction failed: {e}"))?;
-                }
+                at_block
+                    .tx()
+                    .sign_and_submit_then_watch_default(
+                        &api::tx().content_reactions().set_reactions(
+                            item_id_param,
+                            rev_id,
+                            reactions_param,
+                        ),
+                        &signer,
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to submit reaction: {e}"))?
+                    .wait_for_finalized_success()
+                    .await
+                    .map_err(|e| format!("Reaction transaction failed: {e}"))?;
 
                 Ok(())
             }
             .await;
 
             if let Err(e) = result {
+                // Revert optimistic update on failure
+                match fetch_reactions_from_indexer(
+                    bytes32_to_hex(&item_id),
+                    revision_id(),
+                    account_store().active_account().map(|a| a.address.clone()),
+                )
+                .await
+                {
+                    Ok(r) => reactions.set(r),
+                    Err(_) => {
+                        // Fall back to the state before the optimistic update
+                        reactions.set(old_reactions);
+                    }
+                }
                 tx_error.set(Some(e));
-            } else {
-                reload_tick.with_mut(|t| *t += 1);
             }
             is_submitting.set(false);
         });
     };
-
-    // Whether the active account is unlocked (has a signer available).
-    let is_unlocked = {
-        let store = account_store();
-        store
-            .active_account_id
-            .as_deref()
-            .map(|id| store.unlocked_signers.contains_key(id))
-            .unwrap_or(false)
-    };
-
-    // Which emoji the active account has already reacted with.
-    let reacted_codepoints: Vec<u32> = reactions()
-        .iter()
-        .filter(|r| r.i_reacted)
-        .map(|r| r.codepoint)
-        .collect();
-
-    // Emojis available to add (not yet reacted by this account).
-    let picker_emojis: Vec<(u32, String)> = AVAILABLE_EMOJI_CODEPOINTS
-        .iter()
-        .filter(|&&cp| !reacted_codepoints.contains(&cp))
-        .filter_map(|&cp| Some((cp, char::from_u32(cp)?.to_string())))
-        .collect();
 
     rsx! {
         div {
@@ -272,11 +361,9 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
             div {
                 class: "reactions-bar",
 
-                // Existing reaction chips
                 for reaction in reactions() {
                     {
                         let cp = reaction.codepoint;
-                        let removing = reaction.i_reacted;
                         let tooltip = reaction.reactors.join(", ");
                         let chip_class = if reaction.i_reacted {
                             "reaction-chip reacted"
@@ -288,14 +375,13 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                                 class: chip_class,
                                 title: "{tooltip}",
                                 disabled: is_submitting() || reaction_insufficient_funds(),
-                                onclick: move |_| submit_tx(cp, removing),
+                                onclick: move |_| toggle_emoji(cp),
                                 "{reaction.emoji_char} {reaction.count}"
                             }
                         }
                     }
                 }
 
-                // "+" button to open/close the picker — only when unlocked
                 if is_unlocked && !picker_emojis.is_empty() {
                     button {
                         class: "reaction-add",
@@ -306,7 +392,6 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                 }
             }
 
-            // Emoji picker dropdown
             if show_picker() {
                 div {
                     class: "reaction-picker",
@@ -314,7 +399,7 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                         button {
                             class: "picker-emoji",
                             disabled: is_submitting() || reaction_insufficient_funds(),
-                            onclick: move |_| submit_tx(cp, false),
+                            onclick: move |_| toggle_emoji(cp),
                             "{ch}"
                         }
                     }

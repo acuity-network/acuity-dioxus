@@ -274,7 +274,7 @@ pub fn CommentCard(
             // ── Reactions ─────────────────────────────────────────────────────
             Reactions {
                 item_id: comment_item_id,
-                revision_id: selected_revision_id(),
+                revision_id: ReadSignal::<u32>::from(selected_revision_id),
             }
 
             // ── Action buttons (Reply / Edit) ─────────────────────────────────

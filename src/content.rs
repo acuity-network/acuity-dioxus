@@ -419,6 +419,10 @@ pub fn is_content_event(decoded_event: &IndexerDecodedEvent, event_name: &str) -
     decoded_event.pallet_name() == "Content" && decoded_event.event_name() == event_name
 }
 
+pub fn is_content_reactions_event(decoded_event: &IndexerDecodedEvent, event_name: &str) -> bool {
+    decoded_event.pallet_name() == "ContentReactions" && decoded_event.event_name() == event_name
+}
+
 pub fn event_string_field<'a>(decoded_event: &'a IndexerDecodedEvent, field_name: &str) -> Option<&'a str> {
     decoded_event.field(field_name).and_then(Value::as_str)
 }

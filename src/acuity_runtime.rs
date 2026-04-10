@@ -1028,9 +1028,6 @@ pub mod api {
         pub fn account_profile(&self) -> account_profile::storage::StorageApi {
             account_profile::storage::StorageApi
         }
-        pub fn content_reactions(&self) -> content_reactions::storage::StorageApi {
-            content_reactions::storage::StorageApi
-        }
     }
     pub struct TransactionApi;
     impl TransactionApi {
@@ -1076,9 +1073,9 @@ pub mod api {
             .hash();
         runtime_metadata_hash
             == [
-                243u8, 117u8, 191u8, 182u8, 4u8, 199u8, 214u8, 236u8, 209u8, 197u8, 81u8, 17u8,
-                20u8, 193u8, 248u8, 212u8, 201u8, 146u8, 36u8, 9u8, 11u8, 80u8, 111u8, 200u8,
-                170u8, 140u8, 5u8, 19u8, 19u8, 241u8, 193u8, 48u8,
+                253u8, 148u8, 17u8, 190u8, 60u8, 7u8, 123u8, 134u8, 253u8, 41u8, 94u8, 69u8, 115u8,
+                249u8, 62u8, 215u8, 121u8, 86u8, 196u8, 109u8, 61u8, 208u8, 141u8, 99u8, 22u8,
+                51u8, 28u8, 63u8, 177u8, 15u8, 250u8, 217u8,
             ]
     }
     pub mod system {
@@ -2003,10 +2000,10 @@ pub mod api {
                         "System",
                         "Events",
                         [
-                            6u8, 93u8, 0u8, 73u8, 123u8, 123u8, 109u8, 27u8, 153u8, 165u8, 74u8,
-                            188u8, 65u8, 124u8, 218u8, 131u8, 209u8, 188u8, 243u8, 213u8, 133u8,
-                            238u8, 131u8, 50u8, 139u8, 187u8, 229u8, 187u8, 65u8, 79u8, 179u8,
-                            61u8,
+                            243u8, 148u8, 164u8, 249u8, 14u8, 15u8, 215u8, 101u8, 62u8, 157u8,
+                            210u8, 45u8, 128u8, 117u8, 30u8, 121u8, 214u8, 61u8, 251u8, 204u8,
+                            28u8, 215u8, 15u8, 134u8, 32u8, 20u8, 238u8, 91u8, 179u8, 221u8, 216u8,
+                            58u8,
                         ],
                     )
                 }
@@ -4559,10 +4556,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                57u8, 195u8, 249u8, 69u8, 133u8, 240u8, 69u8, 4u8, 132u8, 50u8,
-                                147u8, 150u8, 41u8, 27u8, 251u8, 169u8, 222u8, 248u8, 229u8, 136u8,
-                                124u8, 226u8, 123u8, 68u8, 239u8, 232u8, 180u8, 9u8, 71u8, 124u8,
-                                222u8, 243u8,
+                                70u8, 130u8, 46u8, 245u8, 139u8, 31u8, 38u8, 158u8, 38u8, 145u8,
+                                39u8, 117u8, 55u8, 131u8, 169u8, 26u8, 34u8, 96u8, 32u8, 163u8,
+                                158u8, 229u8, 236u8, 230u8, 206u8, 1u8, 205u8, 6u8, 209u8, 16u8,
+                                27u8, 98u8,
                             ],
                         )
                     }
@@ -4585,10 +4582,10 @@ pub mod api {
                                 weight,
                             },
                             [
-                                116u8, 123u8, 31u8, 149u8, 52u8, 62u8, 176u8, 9u8, 33u8, 6u8,
-                                164u8, 113u8, 190u8, 68u8, 73u8, 208u8, 61u8, 108u8, 48u8, 151u8,
-                                232u8, 38u8, 223u8, 127u8, 141u8, 158u8, 55u8, 167u8, 221u8, 253u8,
-                                139u8, 77u8,
+                                71u8, 20u8, 222u8, 239u8, 64u8, 237u8, 4u8, 211u8, 128u8, 214u8,
+                                87u8, 134u8, 86u8, 65u8, 97u8, 21u8, 225u8, 225u8, 177u8, 33u8,
+                                183u8, 79u8, 142u8, 27u8, 150u8, 107u8, 153u8, 20u8, 217u8, 149u8,
+                                48u8, 222u8,
                             ],
                         )
                     }
@@ -4627,10 +4624,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                234u8, 157u8, 140u8, 164u8, 233u8, 113u8, 14u8, 57u8, 203u8, 252u8,
-                                35u8, 25u8, 149u8, 11u8, 210u8, 38u8, 170u8, 77u8, 235u8, 207u8,
-                                67u8, 95u8, 178u8, 214u8, 21u8, 139u8, 27u8, 13u8, 111u8, 155u8,
-                                210u8, 27u8,
+                                66u8, 178u8, 57u8, 171u8, 99u8, 7u8, 202u8, 194u8, 230u8, 145u8,
+                                136u8, 109u8, 200u8, 208u8, 53u8, 27u8, 123u8, 248u8, 223u8, 127u8,
+                                97u8, 127u8, 77u8, 53u8, 2u8, 93u8, 175u8, 67u8, 172u8, 202u8,
+                                116u8, 238u8,
                             ],
                         )
                     }
@@ -5821,57 +5818,29 @@ pub mod api {
             )]
             #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
             #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-            #[doc = "Adds an emoji reaction for the caller on a specific item revision."]
+            #[doc = "Sets the caller's full reaction set for a specific item revision,"]
+            #[doc = "replacing any prior reactions."]
             #[doc = ""]
-            #[doc = "Re-adding the same emoji is a no-op and does not emit a duplicate"]
-            #[doc = "event."]
-            pub struct AddReaction {
-                pub item_id: add_reaction::ItemId,
-                pub revision_id: add_reaction::RevisionId,
-                pub emoji: add_reaction::Emoji,
+            #[doc = "The entire reaction set is emitted in a single `SetReactions` event."]
+            #[doc = "Duplicates within the provided set are rejected."]
+            pub struct SetReactions {
+                pub item_id: set_reactions::ItemId,
+                pub revision_id: set_reactions::RevisionId,
+                pub reactions: set_reactions::Reactions,
             }
-            pub mod add_reaction {
+            pub mod set_reactions {
                 use super::runtime_types;
                 pub type ItemId = runtime_types::pallet_content::pallet::ItemId;
                 pub type RevisionId = ::core::primitive::u32;
-                pub type Emoji = runtime_types::pallet_content_reactions::pallet::Emoji;
+                pub type Reactions = runtime_types::bounded_collections::bounded_vec::BoundedVec<
+                    runtime_types::pallet_content_reactions::pallet::Emoji,
+                >;
             }
-            impl AddReaction {
+            impl SetReactions {
                 const PALLET_NAME: &'static str = "ContentReactions";
-                const CALL_NAME: &'static str = "add_reaction";
+                const CALL_NAME: &'static str = "set_reactions";
             }
-            impl ::subxt::extrinsics::DecodeAsExtrinsic for AddReaction {
-                fn is_extrinsic(pallet_name: &str, call_name: &str) -> bool {
-                    pallet_name == Self::PALLET_NAME && call_name == Self::CALL_NAME
-                }
-            }
-            #[derive(
-                :: subxt :: ext :: scale_decode :: DecodeAsType,
-                :: subxt :: ext :: scale_encode :: EncodeAsType,
-                Debug,
-            )]
-            #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-            #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-            #[doc = "Removes an emoji reaction for the caller on a specific item revision."]
-            #[doc = ""]
-            #[doc = "Removing an emoji that is not present is a no-op and does not emit an"]
-            #[doc = "event."]
-            pub struct RemoveReaction {
-                pub item_id: remove_reaction::ItemId,
-                pub revision_id: remove_reaction::RevisionId,
-                pub emoji: remove_reaction::Emoji,
-            }
-            pub mod remove_reaction {
-                use super::runtime_types;
-                pub type ItemId = runtime_types::pallet_content::pallet::ItemId;
-                pub type RevisionId = ::core::primitive::u32;
-                pub type Emoji = runtime_types::pallet_content_reactions::pallet::Emoji;
-            }
-            impl RemoveReaction {
-                const PALLET_NAME: &'static str = "ContentReactions";
-                const CALL_NAME: &'static str = "remove_reaction";
-            }
-            impl ::subxt::extrinsics::DecodeAsExtrinsic for RemoveReaction {
+            impl ::subxt::extrinsics::DecodeAsExtrinsic for SetReactions {
                 fn is_extrinsic(pallet_name: &str, call_name: &str) -> bool {
                     pallet_name == Self::PALLET_NAME && call_name == Self::CALL_NAME
                 }
@@ -5879,57 +5848,31 @@ pub mod api {
             pub mod api {
                 pub struct TransactionApi;
                 impl TransactionApi {
-                    #[doc = "Adds an emoji reaction for the caller on a specific item revision."]
+                    #[doc = "Sets the caller's full reaction set for a specific item revision,"]
+                    #[doc = "replacing any prior reactions."]
                     #[doc = ""]
-                    #[doc = "Re-adding the same emoji is a no-op and does not emit a duplicate"]
-                    #[doc = "event."]
-                    pub fn add_reaction(
+                    #[doc = "The entire reaction set is emitted in a single `SetReactions` event."]
+                    #[doc = "Duplicates within the provided set are rejected."]
+                    pub fn set_reactions(
                         &self,
-                        item_id: super::add_reaction::ItemId,
-                        revision_id: super::add_reaction::RevisionId,
-                        emoji: super::add_reaction::Emoji,
-                    ) -> ::subxt::transactions::StaticPayload<super::AddReaction>
+                        item_id: super::set_reactions::ItemId,
+                        revision_id: super::set_reactions::RevisionId,
+                        reactions: super::set_reactions::Reactions,
+                    ) -> ::subxt::transactions::StaticPayload<super::SetReactions>
                     {
                         ::subxt::transactions::StaticPayload::new_static(
                             "ContentReactions",
-                            "add_reaction",
-                            super::AddReaction {
+                            "set_reactions",
+                            super::SetReactions {
                                 item_id,
                                 revision_id,
-                                emoji,
+                                reactions,
                             },
                             [
-                                232u8, 199u8, 234u8, 179u8, 73u8, 87u8, 155u8, 78u8, 20u8, 32u8,
-                                245u8, 186u8, 129u8, 210u8, 183u8, 123u8, 195u8, 86u8, 91u8, 235u8,
-                                207u8, 161u8, 174u8, 163u8, 173u8, 176u8, 88u8, 233u8, 36u8, 206u8,
-                                11u8, 101u8,
-                            ],
-                        )
-                    }
-                    #[doc = "Removes an emoji reaction for the caller on a specific item revision."]
-                    #[doc = ""]
-                    #[doc = "Removing an emoji that is not present is a no-op and does not emit an"]
-                    #[doc = "event."]
-                    pub fn remove_reaction(
-                        &self,
-                        item_id: super::remove_reaction::ItemId,
-                        revision_id: super::remove_reaction::RevisionId,
-                        emoji: super::remove_reaction::Emoji,
-                    ) -> ::subxt::transactions::StaticPayload<super::RemoveReaction>
-                    {
-                        ::subxt::transactions::StaticPayload::new_static(
-                            "ContentReactions",
-                            "remove_reaction",
-                            super::RemoveReaction {
-                                item_id,
-                                revision_id,
-                                emoji,
-                            },
-                            [
-                                146u8, 49u8, 42u8, 20u8, 155u8, 212u8, 213u8, 124u8, 88u8, 222u8,
-                                224u8, 87u8, 175u8, 244u8, 207u8, 233u8, 131u8, 34u8, 198u8, 109u8,
-                                181u8, 97u8, 79u8, 31u8, 24u8, 158u8, 72u8, 111u8, 181u8, 18u8,
-                                164u8, 57u8,
+                                48u8, 125u8, 91u8, 239u8, 153u8, 94u8, 97u8, 71u8, 171u8, 78u8,
+                                211u8, 167u8, 101u8, 67u8, 1u8, 205u8, 16u8, 135u8, 139u8, 140u8,
+                                70u8, 237u8, 243u8, 1u8, 114u8, 131u8, 3u8, 83u8, 141u8, 55u8,
+                                14u8, 56u8,
                             ],
                         )
                     }
@@ -5947,104 +5890,32 @@ pub mod api {
             )]
             #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
             #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-            #[doc = "An emoji reaction was added."]
-            pub struct AddReaction {
-                pub item_id: add_reaction::ItemId,
-                pub revision_id: add_reaction::RevisionId,
-                pub item_owner: add_reaction::ItemOwner,
-                pub reactor: add_reaction::Reactor,
-                pub emoji: add_reaction::Emoji,
+            #[doc = "The caller's reaction set for a specific item revision was set."]
+            pub struct SetReactions {
+                pub item_id: set_reactions::ItemId,
+                pub revision_id: set_reactions::RevisionId,
+                pub item_owner: set_reactions::ItemOwner,
+                pub reactor: set_reactions::Reactor,
+                pub reactions: set_reactions::Reactions,
             }
-            pub mod add_reaction {
+            pub mod set_reactions {
                 use super::runtime_types;
                 pub type ItemId = runtime_types::pallet_content::pallet::ItemId;
                 pub type RevisionId = ::core::primitive::u32;
                 pub type ItemOwner = ::subxt::utils::AccountId32;
                 pub type Reactor = ::subxt::utils::AccountId32;
-                pub type Emoji = runtime_types::pallet_content_reactions::pallet::Emoji;
-            }
-            impl AddReaction {
-                const PALLET_NAME: &'static str = "ContentReactions";
-                const EVENT_NAME: &'static str = "AddReaction";
-            }
-            impl ::subxt::events::DecodeAsEvent for AddReaction {
-                fn is_event(pallet_name: &str, event_name: &str) -> bool {
-                    pallet_name == Self::PALLET_NAME && event_name == Self::EVENT_NAME
-                }
-            }
-            #[derive(
-                :: subxt :: ext :: scale_decode :: DecodeAsType,
-                :: subxt :: ext :: scale_encode :: EncodeAsType,
-                Debug,
-            )]
-            #[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-            #[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-            #[doc = "An emoji reaction was removed."]
-            pub struct RemoveReaction {
-                pub item_id: remove_reaction::ItemId,
-                pub revision_id: remove_reaction::RevisionId,
-                pub item_owner: remove_reaction::ItemOwner,
-                pub reactor: remove_reaction::Reactor,
-                pub emoji: remove_reaction::Emoji,
-            }
-            pub mod remove_reaction {
-                use super::runtime_types;
-                pub type ItemId = runtime_types::pallet_content::pallet::ItemId;
-                pub type RevisionId = ::core::primitive::u32;
-                pub type ItemOwner = ::subxt::utils::AccountId32;
-                pub type Reactor = ::subxt::utils::AccountId32;
-                pub type Emoji = runtime_types::pallet_content_reactions::pallet::Emoji;
-            }
-            impl RemoveReaction {
-                const PALLET_NAME: &'static str = "ContentReactions";
-                const EVENT_NAME: &'static str = "RemoveReaction";
-            }
-            impl ::subxt::events::DecodeAsEvent for RemoveReaction {
-                fn is_event(pallet_name: &str, event_name: &str) -> bool {
-                    pallet_name == Self::PALLET_NAME && event_name == Self::EVENT_NAME
-                }
-            }
-        }
-        pub mod storage {
-            use super::root_mod;
-            use super::runtime_types;
-            pub struct StorageApi;
-            impl StorageApi {
-                #[doc = " Per-account reaction sets keyed by item id, revision id, and reacting account."]
-                pub fn item_account_reactions(
-                    &self,
-                ) -> ::subxt::storage::StaticAddress<
-                    (
-                        item_account_reactions::input::Param0,
-                        item_account_reactions::input::Param1,
-                        item_account_reactions::input::Param2,
-                    ),
-                    item_account_reactions::Output,
-                    ::subxt::utils::Maybe,
-                > {
-                    ::subxt::storage::StaticAddress::new_static(
-                        "ContentReactions",
-                        "ItemAccountReactions",
-                        [
-                            45u8, 181u8, 10u8, 51u8, 32u8, 252u8, 165u8, 203u8, 189u8, 56u8, 31u8,
-                            227u8, 219u8, 92u8, 39u8, 30u8, 220u8, 56u8, 180u8, 190u8, 30u8, 25u8,
-                            213u8, 195u8, 222u8, 73u8, 31u8, 117u8, 187u8, 227u8, 111u8, 7u8,
-                        ],
-                    )
-                }
-            }
-            pub mod item_account_reactions {
-                use super::root_mod;
-                use super::runtime_types;
-                pub mod input {
-                    use super::runtime_types;
-                    pub type Param0 = runtime_types::pallet_content::pallet::ItemId;
-                    pub type Param1 = ::core::primitive::u32;
-                    pub type Param2 = ::subxt::utils::AccountId32;
-                }
-                pub type Output = runtime_types::bounded_collections::bounded_vec::BoundedVec<
+                pub type Reactions = runtime_types::bounded_collections::bounded_vec::BoundedVec<
                     runtime_types::pallet_content_reactions::pallet::Emoji,
                 >;
+            }
+            impl SetReactions {
+                const PALLET_NAME: &'static str = "ContentReactions";
+                const EVENT_NAME: &'static str = "SetReactions";
+            }
+            impl ::subxt::events::DecodeAsEvent for SetReactions {
+                fn is_event(pallet_name: &str, event_name: &str) -> bool {
+                    pallet_name == Self::PALLET_NAME && event_name == Self::EVENT_NAME
+                }
             }
         }
     }
@@ -6382,10 +6253,10 @@ pub mod api {
                             "batch",
                             super::Batch { calls },
                             [
-                                95u8, 72u8, 25u8, 209u8, 4u8, 177u8, 178u8, 185u8, 135u8, 59u8,
-                                166u8, 112u8, 103u8, 246u8, 239u8, 243u8, 239u8, 127u8, 44u8,
-                                141u8, 83u8, 86u8, 194u8, 108u8, 58u8, 11u8, 144u8, 33u8, 242u8,
-                                188u8, 30u8, 13u8,
+                                50u8, 212u8, 166u8, 222u8, 118u8, 135u8, 100u8, 146u8, 165u8,
+                                135u8, 195u8, 99u8, 151u8, 161u8, 102u8, 61u8, 166u8, 169u8, 56u8,
+                                120u8, 248u8, 200u8, 105u8, 51u8, 74u8, 111u8, 181u8, 76u8, 93u8,
+                                100u8, 161u8, 176u8,
                             ],
                         )
                     }
@@ -6416,10 +6287,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                123u8, 153u8, 72u8, 88u8, 5u8, 3u8, 44u8, 100u8, 28u8, 85u8, 100u8,
-                                209u8, 255u8, 69u8, 204u8, 97u8, 78u8, 201u8, 63u8, 171u8, 14u8,
-                                151u8, 85u8, 26u8, 247u8, 108u8, 175u8, 64u8, 134u8, 64u8, 113u8,
-                                204u8,
+                                48u8, 6u8, 35u8, 145u8, 92u8, 110u8, 202u8, 254u8, 133u8, 50u8,
+                                190u8, 166u8, 103u8, 203u8, 252u8, 43u8, 210u8, 42u8, 38u8, 88u8,
+                                25u8, 72u8, 13u8, 42u8, 211u8, 77u8, 193u8, 112u8, 176u8, 147u8,
+                                118u8, 29u8,
                             ],
                         )
                     }
@@ -6445,10 +6316,10 @@ pub mod api {
                             "batch_all",
                             super::BatchAll { calls },
                             [
-                                90u8, 149u8, 140u8, 124u8, 5u8, 226u8, 39u8, 236u8, 39u8, 189u8,
-                                79u8, 215u8, 193u8, 93u8, 150u8, 61u8, 139u8, 30u8, 167u8, 96u8,
-                                183u8, 76u8, 135u8, 120u8, 122u8, 165u8, 2u8, 10u8, 83u8, 122u8,
-                                83u8, 33u8,
+                                12u8, 57u8, 50u8, 160u8, 172u8, 192u8, 112u8, 42u8, 14u8, 58u8,
+                                44u8, 193u8, 85u8, 32u8, 109u8, 79u8, 163u8, 111u8, 21u8, 29u8,
+                                78u8, 88u8, 231u8, 20u8, 93u8, 49u8, 43u8, 182u8, 187u8, 147u8,
+                                51u8, 11u8,
                             ],
                         )
                     }
@@ -6472,10 +6343,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                81u8, 37u8, 80u8, 168u8, 27u8, 5u8, 207u8, 172u8, 217u8, 145u8,
-                                135u8, 50u8, 1u8, 109u8, 109u8, 21u8, 126u8, 194u8, 174u8, 153u8,
-                                151u8, 200u8, 152u8, 112u8, 33u8, 132u8, 20u8, 69u8, 77u8, 206u8,
-                                229u8, 186u8,
+                                54u8, 11u8, 106u8, 143u8, 91u8, 101u8, 45u8, 51u8, 127u8, 205u8,
+                                238u8, 244u8, 224u8, 233u8, 219u8, 213u8, 12u8, 188u8, 33u8, 157u8,
+                                220u8, 163u8, 145u8, 183u8, 114u8, 47u8, 52u8, 230u8, 154u8, 218u8,
+                                15u8, 9u8,
                             ],
                         )
                     }
@@ -6502,10 +6373,10 @@ pub mod api {
                             "force_batch",
                             super::ForceBatch { calls },
                             [
-                                81u8, 157u8, 192u8, 104u8, 255u8, 68u8, 202u8, 119u8, 68u8, 23u8,
-                                151u8, 250u8, 128u8, 106u8, 97u8, 192u8, 142u8, 62u8, 196u8, 153u8,
-                                190u8, 28u8, 224u8, 143u8, 213u8, 5u8, 20u8, 81u8, 13u8, 54u8,
-                                253u8, 63u8,
+                                119u8, 204u8, 230u8, 66u8, 178u8, 192u8, 128u8, 119u8, 131u8,
+                                245u8, 234u8, 147u8, 0u8, 106u8, 33u8, 181u8, 251u8, 184u8, 56u8,
+                                55u8, 219u8, 178u8, 180u8, 152u8, 59u8, 158u8, 214u8, 88u8, 246u8,
+                                48u8, 154u8, 253u8,
                             ],
                         )
                     }
@@ -6529,10 +6400,10 @@ pub mod api {
                                 weight,
                             },
                             [
-                                78u8, 255u8, 58u8, 252u8, 172u8, 93u8, 211u8, 54u8, 3u8, 85u8,
-                                25u8, 74u8, 114u8, 190u8, 220u8, 125u8, 122u8, 211u8, 124u8, 160u8,
-                                138u8, 213u8, 91u8, 85u8, 175u8, 120u8, 75u8, 233u8, 65u8, 195u8,
-                                21u8, 174u8,
+                                212u8, 91u8, 23u8, 70u8, 94u8, 167u8, 54u8, 234u8, 12u8, 82u8,
+                                204u8, 111u8, 211u8, 238u8, 202u8, 190u8, 253u8, 3u8, 180u8, 220u8,
+                                179u8, 103u8, 145u8, 46u8, 1u8, 192u8, 130u8, 181u8, 246u8, 44u8,
+                                153u8, 9u8,
                             ],
                         )
                     }
@@ -6572,10 +6443,10 @@ pub mod api {
                                 fallback: ::subxt::alloc::boxed::Box::new(fallback),
                             },
                             [
-                                45u8, 246u8, 103u8, 154u8, 221u8, 4u8, 181u8, 132u8, 40u8, 30u8,
-                                72u8, 253u8, 84u8, 187u8, 69u8, 187u8, 211u8, 163u8, 105u8, 33u8,
-                                163u8, 214u8, 2u8, 147u8, 15u8, 31u8, 69u8, 62u8, 198u8, 158u8,
-                                59u8, 174u8,
+                                19u8, 244u8, 45u8, 109u8, 159u8, 48u8, 254u8, 244u8, 168u8, 221u8,
+                                167u8, 247u8, 74u8, 191u8, 28u8, 122u8, 224u8, 165u8, 223u8, 251u8,
+                                187u8, 53u8, 101u8, 166u8, 13u8, 28u8, 214u8, 217u8, 181u8, 32u8,
+                                136u8, 225u8,
                             ],
                         )
                     }
@@ -6598,10 +6469,10 @@ pub mod api {
                                 call: ::subxt::alloc::boxed::Box::new(call),
                             },
                             [
-                                194u8, 40u8, 57u8, 132u8, 26u8, 183u8, 55u8, 162u8, 199u8, 175u8,
-                                165u8, 30u8, 251u8, 215u8, 255u8, 89u8, 77u8, 13u8, 93u8, 25u8,
-                                17u8, 144u8, 175u8, 223u8, 216u8, 17u8, 198u8, 24u8, 249u8, 61u8,
-                                80u8, 194u8,
+                                169u8, 252u8, 242u8, 40u8, 56u8, 238u8, 35u8, 231u8, 138u8, 73u8,
+                                225u8, 58u8, 127u8, 24u8, 210u8, 143u8, 99u8, 208u8, 104u8, 13u8,
+                                54u8, 221u8, 37u8, 129u8, 193u8, 206u8, 196u8, 193u8, 229u8, 144u8,
+                                20u8, 129u8,
                             ],
                         )
                     }
@@ -8268,24 +8139,17 @@ pub mod api {
                 #[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
                 pub enum Call {
                     #[codec(index = 0)]
-                    #[doc = "Adds an emoji reaction for the caller on a specific item revision."]
+                    #[doc = "Sets the caller's full reaction set for a specific item revision,"]
+                    #[doc = "replacing any prior reactions."]
                     #[doc = ""]
-                    #[doc = "Re-adding the same emoji is a no-op and does not emit a duplicate"]
-                    #[doc = "event."]
-                    add_reaction {
+                    #[doc = "The entire reaction set is emitted in a single `SetReactions` event."]
+                    #[doc = "Duplicates within the provided set are rejected."]
+                    set_reactions {
                         item_id: runtime_types::pallet_content::pallet::ItemId,
                         revision_id: ::core::primitive::u32,
-                        emoji: runtime_types::pallet_content_reactions::pallet::Emoji,
-                    },
-                    #[codec(index = 1)]
-                    #[doc = "Removes an emoji reaction for the caller on a specific item revision."]
-                    #[doc = ""]
-                    #[doc = "Removing an emoji that is not present is a no-op and does not emit an"]
-                    #[doc = "event."]
-                    remove_reaction {
-                        item_id: runtime_types::pallet_content::pallet::ItemId,
-                        revision_id: ::core::primitive::u32,
-                        emoji: runtime_types::pallet_content_reactions::pallet::Emoji,
+                        reactions: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+                            runtime_types::pallet_content_reactions::pallet::Emoji,
+                        >,
                     },
                 }
                 #[derive(
@@ -8318,8 +8182,8 @@ pub mod api {
                     #[doc = "The provided emoji value is not a valid non-zero Unicode scalar value."]
                     InvalidEmoji,
                     #[codec(index = 4)]
-                    #[doc = "The account has reached the maximum number of emoji reactions for the item."]
-                    TooManyEmojis,
+                    #[doc = "The provided reaction set contains duplicate emojis."]
+                    DuplicateEmoji,
                 }
                 #[derive(
                     :: subxt :: ext :: scale_decode :: DecodeAsType,
@@ -8331,22 +8195,15 @@ pub mod api {
                 #[doc = "The `Event` enum of this pallet"]
                 pub enum Event {
                     #[codec(index = 0)]
-                    #[doc = "An emoji reaction was added."]
-                    AddReaction {
+                    #[doc = "The caller's reaction set for a specific item revision was set."]
+                    SetReactions {
                         item_id: runtime_types::pallet_content::pallet::ItemId,
                         revision_id: ::core::primitive::u32,
                         item_owner: ::subxt::utils::AccountId32,
                         reactor: ::subxt::utils::AccountId32,
-                        emoji: runtime_types::pallet_content_reactions::pallet::Emoji,
-                    },
-                    #[codec(index = 1)]
-                    #[doc = "An emoji reaction was removed."]
-                    RemoveReaction {
-                        item_id: runtime_types::pallet_content::pallet::ItemId,
-                        revision_id: ::core::primitive::u32,
-                        item_owner: ::subxt::utils::AccountId32,
-                        reactor: ::subxt::utils::AccountId32,
-                        emoji: runtime_types::pallet_content_reactions::pallet::Emoji,
+                        reactions: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+                            runtime_types::pallet_content_reactions::pallet::Emoji,
+                        >,
                     },
                 }
             }
