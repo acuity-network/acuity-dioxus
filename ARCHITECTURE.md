@@ -141,7 +141,7 @@ Item and feed IDs are Base58-encoded 32-byte hashes in URL segments.
 | `PublishFeed` | `publish_feed.rs` | Create a new Feed item (title + description + optional image) |
 | `PublishPost` | `publish_post.rs` | Create a Post inside a Feed (title + body + optional image) |
 | `ItemView` | `item_view/mod.rs` | Full item viewer: revision history selector, owner Edit tab, emoji reactions, feed child posts, recursive `CommentCard` tree |
-| `Reactions` | `item_view/reactions.rs` | Emoji reaction chips with picker; loads reaction state from indexer `SetReactions` events; submits `set_reactions` extrinsic with the full emoji set; uses optimistic local update after tx submission, reverts on failure |
+| `Reactions` | `item_view/reactions.rs` | Emoji reaction chips with picker; loads reaction state from indexer `SetReactions` events; submits `set_reactions` extrinsic with the full emoji set; uses optimistic local update after tx submission, reverts on failure. The indexer currently emits the `reactions` field as either a scalar string/number for a single emoji or an array for multiple emojis, so the UI parser accepts both shapes. |
 | `CommentCard` | `item_view/comment_card.rs` | Recursive comment card: body, revision selector, reactions, inline reply/edit forms, nested children |
 | `ImageDropZone` | `components.rs` | Shared drag-and-drop / click-to-pick image zone; used by `ProfileEdit`, `PublishFeed`, `PublishPost`, and `ItemView` edit tab |
 | `EmptyState` | `components.rs` | Shared centred empty/not-found card with optional CTA link; used by `ProfileView`, `ItemView`, `PublishPost`, `PublishFeed` |
@@ -217,7 +217,7 @@ Accessed via the auto-generated `src/acuity_runtime.rs`:
 | `Content` | `publish_item`, `PublishItem`/`PublishRevision` events |
 | `AccountContent` | `add_item` (pin content to account feed) |
 | `AccountProfile` | `set_profile` (link profile item to account) |
-| `ContentReactions` | Stateless emoji reactions via `set_reactions` extrinsic; reaction state loaded from indexer `SetReactions` events |
+| `ContentReactions` | Stateless emoji reactions via `set_reactions` extrinsic; reaction state loaded from indexer `SetReactions` events queried by `item_id`. The decoded `reactions` field may arrive as a scalar value when only one emoji is present, so clients must not assume an array-only payload shape. |
 | `Utility` | `batch` / `batch_all` for multi-call extrinsics |
 
 ---

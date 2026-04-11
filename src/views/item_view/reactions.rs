@@ -27,14 +27,11 @@ fn parse_u32_from_value(value: &serde_json::Value) -> Option<u32> {
 }
 
 fn parse_reactions_from_event(reactions_value: &serde_json::Value) -> Vec<u32> {
-    reactions_value
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| parse_u32_from_value(v))
-                .collect()
-        })
-        .unwrap_or_default()
+    if let Some(arr) = reactions_value.as_array() {
+        return arr.iter().filter_map(parse_u32_from_value).collect();
+    }
+
+    parse_u32_from_value(reactions_value).into_iter().collect()
 }
 
 async fn fetch_reactions_from_indexer(
@@ -429,5 +426,34 @@ pub fn Reactions(item_id: [u8; 32], revision_id: ReadSignal<u32>) -> Element {
                 p { class: "reactions-loading", "Reactions unavailable: {err}" }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_reactions_from_event;
+    use serde_json::json;
+
+    #[test]
+    fn parse_reactions_from_event_accepts_scalar_string() {
+        assert_eq!(parse_reactions_from_event(&json!("128536")), vec![128536]);
+    }
+
+    #[test]
+    fn parse_reactions_from_event_accepts_scalar_number() {
+        assert_eq!(parse_reactions_from_event(&json!(128536)), vec![128536]);
+    }
+
+    #[test]
+    fn parse_reactions_from_event_accepts_arrays() {
+        assert_eq!(
+            parse_reactions_from_event(&json!(["128536", 128540])),
+            vec![128536, 128540]
+        );
+    }
+
+    #[test]
+    fn parse_reactions_from_event_rejects_invalid_values() {
+        assert!(parse_reactions_from_event(&json!("not-a-number")).is_empty());
     }
 }
