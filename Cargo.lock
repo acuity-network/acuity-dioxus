@@ -41,9 +41,9 @@ dependencies = [
 
 [[package]]
 name = "acuity-index-api-rs"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3f004d22b8daa7405d69618c4525ef8149b76e983c6de609cf706e3e310ec01"
+checksum = "3d3aac70431add9c6c3f2a4bee8e49841c55a757c1c38beabf31b7b3c1c5c715"
 dependencies = [
  "futures",
  "hex",

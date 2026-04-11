@@ -1,5 +1,8 @@
 use crate::IPFS_API_URL;
-use acuity_index_api_rs::{Bytes32, CustomKey, CustomValue, DecodedEvent as IndexerDecodedEvent, IndexerClient, Key};
+use acuity_index_api_rs::{
+    Bytes32, CustomKey, CustomScalarValue, CustomValue, DecodedEvent as IndexerDecodedEvent,
+    IndexerClient, Key,
+};
 use base64::Engine;
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, GenericImageView};
 use parity_scale_codec::Encode;
@@ -413,6 +416,21 @@ pub async fn fetch_events_for_item(
     Ok(response.decoded_events)
 }
 
+/// Fetches all decoded events from the indexer for an exact
+/// `item_id` + `revision_id` composite key.
+pub async fn fetch_events_for_item_revision(
+    client: &IndexerClient,
+    item_id_hex: String,
+    revision_id: u32,
+) -> Result<Vec<IndexerDecodedEvent>, String> {
+    let response = client
+        .get_events(item_revision_query_key(&item_id_hex, revision_id)?, None, None)
+        .await
+        .map_err(|error| format!("Failed to query the indexer: {error}"))?;
+
+    Ok(response.decoded_events)
+}
+
 pub fn is_content_event(decoded_event: &IndexerDecodedEvent, event_name: &str) -> bool {
     decoded_event.pallet_name() == "Content" && decoded_event.event_name() == event_name
 }
@@ -430,6 +448,17 @@ fn item_id_query_key(item_id_hex: &str) -> Result<Key, String> {
     Ok(Key::Custom(CustomKey {
         name: "item_id".to_string(),
         value: CustomValue::Bytes32(Bytes32(item_id)),
+    }))
+}
+
+fn item_revision_query_key(item_id_hex: &str, revision_id: u32) -> Result<Key, String> {
+    let item_id = hex_to_bytes32(item_id_hex)?;
+    Ok(Key::Custom(CustomKey {
+        name: "item_id_revision_id".to_string(),
+        value: CustomValue::Composite(vec![
+            CustomScalarValue::Bytes32(Bytes32(item_id)),
+            CustomScalarValue::U32(revision_id),
+        ]),
     }))
 }
 

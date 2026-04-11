@@ -2,7 +2,7 @@ use acuity_index_api_rs::IndexerClient;
 use crate::{
     accounts::AccountStore,
     acuity_runtime::api,
-    content::{bytes32_to_hex, fetch_events_for_item, is_content_reactions_event},
+    content::{bytes32_to_hex, fetch_events_for_item_revision, is_content_reactions_event},
     runtime_client::{connect as connect_acuity_client, estimate_fee},
     ChainConnection,
 };
@@ -40,21 +40,12 @@ async fn fetch_reactions_from_indexer(
     revision_id: u32,
     active_address: Option<String>,
 ) -> Result<Vec<ReactionSummary>, String> {
-    let decoded_events = fetch_events_for_item(client, item_id_hex).await?;
+    let decoded_events = fetch_events_for_item_revision(client, item_id_hex, revision_id).await?;
 
     let mut reactor_latest: HashMap<String, (u32, u16, Vec<u32>)> = HashMap::new();
 
     for event in &decoded_events {
         if !is_content_reactions_event(event, "SetReactions") {
-            continue;
-        }
-
-        let event_rev_id = event
-            .field("revision_id")
-            .and_then(|v| parse_u32_from_value(v))
-            .unwrap_or(u32::MAX);
-
-        if event_rev_id != revision_id {
             continue;
         }
 
